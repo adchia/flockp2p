@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -35,7 +36,7 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 		ChannelListener, ConnectionInfoListener {
 	private WifiP2pManager p2pManager;
 	private Channel p2pChannel;
-	private final int CLIENT_PORT = 8988;
+	private final static int CLIENT_PORT = 8988;
 
 	// The following lists are aligned.
 	private LinkedList<PeerGroup> peerGroupQueue;
@@ -43,9 +44,12 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 
 	// Temporary information for each connection
 	private static JSONObject currentMessage;
-	private static String serverIP;
+	private static InetAddress groupOwnerAddress;
 
-	// Listener that is fired when we request and get a peer list
+	// Locks
+	private String mutex = "mutex";
+
+	// 3) Listener that is fired when we request and get a peer list
 	private PeerListListener peerListListener = new PeerListListener() {
 		@Override
 		public void onPeersAvailable(WifiP2pDeviceList peerList) {
@@ -59,23 +63,29 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 					config.deviceAddress = deviceAddress;
 					config.wps.setup = WpsInfo.PBC;
 
-					// Connects to device.
-					p2pManager.connect(p2pChannel, config,
-							new ActionListener() {
+					synchronized (mutex) {
+						// Need to create group
 
-								@Override
-								public void onSuccess() {
-									// WiFiDirectBroadcastReceiver will notify
-									// us. Ignore for now.
-								}
+						// Connects to device.
+						p2pManager.connect(p2pChannel, config,
+								new ActionListener() {
 
-								@Override
-								public void onFailure(int reason) {
-								}
-							});
+									@Override
+									public void onSuccess() {
+										// WiFiDirectBroadcastReceiver will
+										// notify
+										// us. Ignore for now.
+									}
+
+									@Override
+									public void onFailure(int reason) {
+									}
+								});
+					}
 				}
+				// Can have JSONObject{encrypted message, peer group id}
+
 			}
-			// Can have JSONObject{encrypted message, peer group id}
 		}
 	};
 
@@ -85,15 +95,12 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 		this.p2pChannel = p2pManager.initialize(context, looper, this);
 	}
 
-	// Checks for internet connectivity and floods out to neighbors
-	public void flood() {
-
-	}
-
+	// 1) Have message to send. Request peer list and save message/group
 	public void sendMessage(JSONObject message, PeerGroup group) {
 		this.peerGroupQueue.push(group);
 		this.messageQueue.push(message);
 
+		// Searches for peers. Keeps going until connected or P2P group made
 		p2pManager.discoverPeers(p2pChannel,
 				new WifiP2pManager.ActionListener() {
 
@@ -115,44 +122,35 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 	public void onReceive(Context context, Intent intent) {
 		String action = intent.getAction();
 		if (WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION.equals(action)) {
-			// Determine if Wifi P2P mode is enabled or not, alert
-			// the Activity.
 			int state = intent.getIntExtra(WifiP2pManager.EXTRA_WIFI_STATE, -1);
 			if (state == WifiP2pManager.WIFI_P2P_STATE_ENABLED) {
-				// activity.setIsWifiP2pEnabled(true);
+				// TODO: notify application WiFi P2P is good to go
 			} else {
-				// activity.setIsWifiP2pEnabled(false);
+				// TODO: notify application we need WiFi P2P
 			}
 		} else if (WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION.equals(action)) {
-
-			// The peer list has changed! We should probably do something about
-			// that.
-
-			// Request available peers from the wifi p2p manager. This is an
-			// asynchronous call and the calling activity is notified with a
-			// callback on PeerListListener.onPeersAvailable()
-			if (p2pManager != null) {
-				p2pManager.requestPeers(p2pChannel, peerListListener);
-			}
+			// 2) Discovered peers. Need to actually request
+			p2pManager.requestPeers(p2pChannel, peerListListener);
 		} else if (WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION
 				.equals(action)) {
+			/**
+			 *  4) We requested to connect to someone and here we are!
+			 *  Get connection information 
+			 */
+
 			NetworkInfo networkInfo = (NetworkInfo) intent
 					.getParcelableExtra(WifiP2pManager.EXTRA_NETWORK_INFO);
 
 			if (networkInfo.isConnected()) {
-
 				// we are connected with the other device, request connection
 				// info to find group owner IP
 				p2pManager.requestConnectionInfo(p2pChannel, this);
 			} else {
-				// It's a disconnect
+				// TODO: Notify application we've disconnected from other device
 			}
 
 		}
 	}
-
-	// TODO: set up server and client sockets to send and receive data
-	// http://developer.android.com/guide/topics/connectivity/wifip2p.html
 
 	@Override
 	public void onChannelDisconnected() {
@@ -205,51 +203,11 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 		}
 	}
 
-	// AsyncTask that sends messages to appropriate device address
-	public static class ClientSocketTask extends
-			AsyncTask<String, Void, JSONObject> {
-
-		@Override
-		protected JSONObject doInBackground(String... params) {
-			try {
-
-				/**
-				 * Create a server socket and wait for client connections. This
-				 * call blocks until a connection is accepted from a client
-				 */
-				ServerSocket serverSocket = new ServerSocket(8888);
-				Socket client = serverSocket.accept();
-
-				/**
-				 * If this code is reached, a client has connected and
-				 * transferred data Save the input stream from the client as a
-				 * JSONObject
-				 */
-
-				InputStream inputStream = client.getInputStream();
-				BufferedReader streamReader = new BufferedReader(
-						new InputStreamReader(inputStream, "UTF-8"));
-				StringBuilder responseStrBuilder = new StringBuilder();
-
-				String inputStr;
-				while ((inputStr = streamReader.readLine()) != null)
-					responseStrBuilder.append(inputStr);
-				JSONObject incomingMessage = new JSONObject(
-						responseStrBuilder.toString());
-				serverSocket.close();
-				return incomingMessage;
-			} catch (IOException e) {
-				return null;
-			} catch (JSONException e) {
-				e.printStackTrace();
-				return null;
-			}
-		}
-	}
-
-	public static void sendMessageThroughSocket(JSONObject message,
-			String deviceAddress) {
-		int port = 8988;
+	/**
+	 * Client-side method that sends message to server
+	 * @param message
+	 */
+	public static void sendMessageThroughSocket(JSONObject message) {
 		Socket socket = new Socket();
 
 		try {
@@ -258,10 +216,10 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 			 * information.
 			 */
 			socket.bind(null);
-			socket.connect((new InetSocketAddress(serverIP, port)), 500);
+			socket.connect((new InetSocketAddress(groupOwnerAddress, CLIENT_PORT)), 500);
 
 			/**
-			 * Create a byte stream from a JPEG file and pipe it to the output
+			 * Create a byte stream from message and pipe it to the output
 			 * stream of the socket. This data will be retrieved by the server
 			 * device.
 			 */
@@ -291,18 +249,25 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 		}
 	}
 
+	/**
+	 * 5) Owner IP is known. Launch server or client threads
+	 * @param info WiFi connection information
+	 */
 	@Override
-	public void onConnectionInfoAvailable(WifiP2pInfo info) {
-		// The owner IP is now known:
-
-		// After the group negotiation, we assign the group owner as the file
-		// server. The file server is single threaded, single connection server
-		// socket.
+	public void onConnectionInfoAvailable(WifiP2pInfo info) {		
+		groupOwnerAddress = info.groupOwnerAddress;
+        
+		// This device is server
 		if (info.groupFormed && info.isGroupOwner) {
 			new ServerSocketTask().execute();
 		} else if (info.groupFormed) {
-			// The other device acts as the client. In this case, we enable the
-			// get file button.
+			// This device is client
+			new Thread(new Runnable() {
+				@Override
+				public void run() {
+					sendMessageThroughSocket(currentMessage);
+				}
+			}).start();
 		}
 	}
 
