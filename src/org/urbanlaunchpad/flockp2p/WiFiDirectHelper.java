@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -93,8 +94,26 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 			WifiP2pManager p2pManager) {
 		this.p2pManager = p2pManager;
 		this.p2pChannel = p2pManager.initialize(context, looper, this);
+		
+		// Reflection to automatically connect
+		try {
+			Class cls = Class.forName("android.net.wifi.p2p.Wifi");
+			Class partypes[] = new Class[1];
+			partypes[0] = Channel.class;
+			Method meth = cls.getMethod("enableP2p", partypes);
+		} catch (ClassNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (NoSuchMethodException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IllegalArgumentException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 
+	// TODO: turn on WiFi Direct
 	// 1) Have message to send. Request peer list and save message/group
 	public void sendMessage(JSONObject message, PeerGroup group) {
 		this.peerGroupQueue.push(group);
