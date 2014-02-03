@@ -2203,70 +2203,7 @@ public class WifiP2pService extends IWifiP2pManager.Stub {
 
         final EditText pin = (EditText) textEntryView.findViewById(R.id.wifi_p2p_wps_pin);
 
-        AlertDialog dialog = new AlertDialog.Builder(mContext)
-            .setTitle(r.getString(R.string.wifi_p2p_invitation_to_connect_title))
-            .setView(textEntryView)
-            .setPositiveButton(r.getString(R.string.accept), new OnClickListener() {
-                        public void onClick(DialogInterface dialog, int which) {
-                            if (wps.setup == WpsInfo.KEYPAD) {
-                                mSavedPeerConfig.wps.pin = pin.getText().toString();
-                            }
-                            if (DBG) logd(getName() + " accept invitation " + mSavedPeerConfig);
-                            sendMessage(PEER_CONNECTION_USER_ACCEPT);
-                        }
-                    })
-            .setNegativeButton(r.getString(R.string.decline), new OnClickListener() {
-                        @Override
-                        public void onClick(DialogInterface dialog, int which) {
-                            if (DBG) logd(getName() + " ignore connect");
-                            sendMessage(PEER_CONNECTION_USER_REJECT);
-                        }
-                    })
-            .setOnCancelListener(new DialogInterface.OnCancelListener() {
-                        @Override
-                        public void onCancel(DialogInterface arg0) {
-                            if (DBG) logd(getName() + " ignore connect");
-                            sendMessage(PEER_CONNECTION_USER_REJECT);
-                        }
-                    })
-            .create();
-
-        //make the enter pin area or the display pin area visible
-        switch (wps.setup) {
-            case WpsInfo.KEYPAD:
-                if (DBG) logd("Enter pin section visible");
-                textEntryView.findViewById(R.id.enter_pin_section).setVisibility(View.VISIBLE);
-                break;
-            case WpsInfo.DISPLAY:
-                if (DBG) logd("Shown pin section visible");
-                addRowToDialog(group, R.string.wifi_p2p_show_pin_message, wps.pin);
-                break;
-            default:
-                break;
-        }
-
-        if ((r.getConfiguration().uiMode & Configuration.UI_MODE_TYPE_APPLIANCE) ==
-                Configuration.UI_MODE_TYPE_APPLIANCE) {
-            // For appliance devices, add a key listener which accepts.
-            dialog.setOnKeyListener(new DialogInterface.OnKeyListener() {
-
-                @Override
-                public boolean onKey(DialogInterface dialog, int keyCode, KeyEvent event) {
-                    // TODO: make the actual key come from a config value.
-                    if (keyCode == KeyEvent.KEYCODE_VOLUME_MUTE) {
-                        sendMessage(PEER_CONNECTION_USER_ACCEPT);
-                        dialog.dismiss();
-                        return true;
-                    }
-                    return false;
-                }
-            });
-            // TODO: add timeout for this dialog.
-            // TODO: update UI in appliance mode to tell user what to do.
-        }
-
-        dialog.getWindow().setType(WindowManager.LayoutParams.TYPE_SYSTEM_ALERT);
-        dialog.show();
+        sendMessage(PEER_CONNECTION_USER_ACCEPT);
     }
 
     /**

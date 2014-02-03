@@ -11,7 +11,7 @@ public class PeerGroup {
 	private String key;
 	private HashMap<String, LinkedList<JSONObject>> messageTypeToQueueMap;
 	public HashSet<String> deviceAddresses;
-	
+
 	public PeerGroup(String key, Collection<String> deviceAddresses) {
 		this.key = key;
 		messageTypeToQueueMap = new HashMap<String, LinkedList<JSONObject>>();
@@ -26,15 +26,23 @@ public class PeerGroup {
 		}
 	}
 
+	public void enqueueMessageOfType(String messageType, JSONObject message) {
+		// Check if we already have the key. Else initialize queue of messages
+		if (messageTypeToQueueMap.containsKey(messageType)) {
+			messageTypeToQueueMap.get(messageType).push(message);
+		}
+	}
+
 	public void removeMessageType(String messageType) {
 		messageTypeToQueueMap.remove(messageType);
 	}
-	
+
 	public void sendMessagesOfType(String messageType, int count) {
 		for (int i = 0; i < count; i++) {
-			JSONObject message = messageTypeToQueueMap.get(messageType).removeLast();
+			JSONObject message = messageTypeToQueueMap.get(messageType)
+					.removeLast();
 			FlockP2PManager.p2pNetworkHelper.sendMessage(message, this);
 		}
 	}
-	
+
 }

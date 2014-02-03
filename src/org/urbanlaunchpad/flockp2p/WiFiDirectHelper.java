@@ -65,8 +65,6 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 					config.wps.setup = WpsInfo.PBC;
 
 					synchronized (mutex) {
-						// Need to create group
-
 						// Connects to device.
 						p2pManager.connect(p2pChannel, config,
 								new ActionListener() {
@@ -94,23 +92,6 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 			WifiP2pManager p2pManager) {
 		this.p2pManager = p2pManager;
 		this.p2pChannel = p2pManager.initialize(context, looper, this);
-		
-		// Reflection to automatically connect
-		try {
-			Class cls = Class.forName("android.net.wifi.p2p.Wifi");
-			Class partypes[] = new Class[1];
-			partypes[0] = Channel.class;
-			Method meth = cls.getMethod("enableP2p", partypes);
-		} catch (ClassNotFoundException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (NoSuchMethodException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IllegalArgumentException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
 	}
 
 	// TODO: turn on WiFi Direct
