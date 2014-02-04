@@ -11,7 +11,7 @@ import com.google.common.collect.MinMaxPriorityQueue;
 
 public class PeerGroup {
 	public String key;
-	private HashMap<String, LinkedList<JSONObject>> messageTypeToQueueMap;
+	public HashMap<String, LinkedList<JSONObject>> messageTypeToQueueMap;
 	public HashSet<String> deviceAddresses;
 	public String name;
 	public MinMaxPriorityQueue<AddressToHopCount> bestPlacesToSend;
@@ -71,6 +71,10 @@ public class PeerGroup {
 		messageTypeToQueueMap.remove(messageType);
 	}
 
+	public boolean hasMessageOfType(String messageType) {
+		return messageTypeToQueueMap.get(messageType).peekLast() != null;
+	}
+	
 	public void sendMessagesOfType(String messageType, int count) {
 		for (int i = 0; i < count; i++) {
 			JSONObject message = messageTypeToQueueMap.get(messageType)

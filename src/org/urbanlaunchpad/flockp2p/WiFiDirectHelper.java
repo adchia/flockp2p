@@ -92,6 +92,8 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 			WifiP2pManager p2pManager) {
 		this.p2pManager = p2pManager;
 		this.p2pChannel = p2pManager.initialize(context, looper, this);
+		this.peerGroupQueue = new LinkedList<PeerGroup>();
+		this.messageQueue = new LinkedList<JSONObject>();
 	}
 
 	// 1) Have message to send. Request peer list and save message/group
