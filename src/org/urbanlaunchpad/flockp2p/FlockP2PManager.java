@@ -10,6 +10,7 @@ import org.json.JSONObject;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.IntentFilter;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.wifi.WifiInfo;
@@ -23,6 +24,7 @@ public class FlockP2PManager {
 	public boolean connectedToWiFi = false;
 	public Activity activity;
 	private static int FLOOD_PERIOD = 30000;
+    private final IntentFilter intentFilter = new IntentFilter();
 
 	// Booleans representing modes of p2p
 	private boolean CHECK_ALREADY_UPLOADED = false;
@@ -55,6 +57,13 @@ public class FlockP2PManager {
 		messagePriorityList = new ArrayList<String>();
 		peerGroupMap = new HashMap<String, PeerGroup>();
 
+		// add necessary intent values to be matched and register
+        intentFilter.addAction(WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION);
+        intentFilter.addAction(WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION);
+        intentFilter.addAction(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION);
+        intentFilter.addAction(WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION);
+        activity.registerReceiver(p2pNetworkHelper, intentFilter);
+        
 		// turn on wifi direct
 		WifiManager wifiManager = (WifiManager) activity
 				.getSystemService(Context.WIFI_SERVICE);
