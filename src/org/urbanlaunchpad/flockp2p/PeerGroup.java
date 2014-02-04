@@ -12,15 +12,17 @@ import com.google.common.collect.MinMaxPriorityQueue;
 public class PeerGroup {
 	public String key;
 	public HashMap<String, LinkedList<JSONObject>> messageTypeToQueueMap;
+	public HashMap<String, Integer> messageTypeToPriorityCount;
 	public HashSet<String> deviceAddresses;
 	public String name;
 	public MinMaxPriorityQueue<AddressToHopCount> bestPlacesToSend;
 	public static final int MAX_NUM_ADDRESS_HOP_COUNTS = 10;
-	
+	public int numMessages = 0;
+
 	public class AddressToHopCount implements Comparable<AddressToHopCount> {
 		public final String address;
 		public final int hopCount;
-		
+
 		public AddressToHopCount(String address, int hopCount) {
 			this.address = address;
 			this.hopCount = hopCount;
@@ -34,17 +36,18 @@ public class PeerGroup {
 				return 0;
 			return 1;
 		}
-		
+
 	}
 
 	public PeerGroup(String key, String name, Collection<String> deviceAddresses) {
 		this.key = key;
 		this.name = name;
-		messageTypeToQueueMap = new HashMap<String, LinkedList<JSONObject>>();
+		this.messageTypeToQueueMap = new HashMap<String, LinkedList<JSONObject>>();
+		this.messageTypeToPriorityCount = new HashMap<String, Integer>();
 		this.deviceAddresses = new HashSet<String>();
 		this.bestPlacesToSend = MinMaxPriorityQueue.create();
 	}
-	
+
 	public void receiveFlood(String deviceAddress, int hopCount) {
 		bestPlacesToSend.add(new AddressToHopCount(deviceAddress, hopCount));
 		if (bestPlacesToSend.size() > MAX_NUM_ADDRESS_HOP_COUNTS) {
@@ -52,11 +55,19 @@ public class PeerGroup {
 		}
 	}
 
-	public void addMessageType(String messageType) {
+	private void resetPriorityCounts() {
+		for (String messageType : messageTypeToPriorityCount.keySet()) {
+			messageTypeToPriorityCount.put(messageType,
+					FlockP2PManager.messageTypeToPriorityMap.get(messageType));
+		}
+	}
+
+	public void addMessageType(String messageType, Integer priority) {
 		// Check if we already have the key. Else initialize queue of messages
 		if (!messageTypeToQueueMap.containsKey(messageType)) {
 			messageTypeToQueueMap
 					.put(messageType, new LinkedList<JSONObject>());
+			messageTypeToPriorityCount.put(messageType, priority);
 		}
 	}
 
@@ -64,23 +75,49 @@ public class PeerGroup {
 		// Check if we already have the key. Else initialize queue of messages
 		if (messageTypeToQueueMap.containsKey(messageType)) {
 			messageTypeToQueueMap.get(messageType).push(message);
+			numMessages++;
 		}
 	}
 
 	public void removeMessageType(String messageType) {
+		numMessages -= messageTypeToQueueMap.get(messageType).size();
 		messageTypeToQueueMap.remove(messageType);
+		messageTypeToPriorityCount.remove(messageType);
 	}
 
 	public boolean hasMessageOfType(String messageType) {
-		return messageTypeToQueueMap.get(messageType).peekLast() != null;
+		return messageTypeToQueueMap.get(messageType).size() > 0;
 	}
-	
-	public void sendMessagesOfType(String messageType, int count) {
-		for (int i = 0; i < count; i++) {
-			JSONObject message = messageTypeToQueueMap.get(messageType)
-					.removeLast();
-			FlockP2PManager.p2pNetworkHelper.sendMessage(message, this);
+
+	public boolean hasMessages() {
+		return numMessages > 0;
+	}
+
+	/**
+	 * Send a single message
+	 * Returns boolean telling whether we sent a message or not
+	 */
+	public boolean sendMessage() {
+		for (String messageType : FlockP2PManager.messagePriorityList) {
+			// Check if this has priority
+			int count = messageTypeToPriorityCount.get(messageType);
+			if (hasMessageOfType(messageType) && count > 0) {
+				messageTypeToPriorityCount.put(messageType, count - 1);
+				numMessages--;
+				sendMessagesOfType(messageType);
+				return true;
+			}
 		}
+		
+		// No messages to send
+		resetPriorityCounts();
+		return false;
+	}
+
+	private void sendMessagesOfType(String messageType) {
+		JSONObject message = messageTypeToQueueMap.get(messageType)
+				.removeLast();
+		FlockP2PManager.p2pNetworkHelper.sendMessage(message, this);
 	}
 
 }

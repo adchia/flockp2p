@@ -15,6 +15,7 @@ import android.net.NetworkInfo;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.net.wifi.p2p.WifiP2pManager;
+import android.util.Log;
 
 public class FlockP2PManager {
 	public static WiFiDirectHelper p2pNetworkHelper;
@@ -28,8 +29,8 @@ public class FlockP2PManager {
 	private boolean SIMPLE_MODE = true;
 
 	// Keeping track of our message types and priorities
-	private HashMap<String, Integer> messageTypeToPriorityMap;
-	private ArrayList<String> messagePriorityList;
+	public static HashMap<String, Integer> messageTypeToPriorityMap;
+	public static ArrayList<String> messagePriorityList;
 	public static HashMap<String, PeerGroup> peerGroupMap;
 
 	// Keys into JSON Object
@@ -63,11 +64,14 @@ public class FlockP2PManager {
 		new Thread(new Runnable() {
 			@Override
 			public void run() {
-				flood();
-				try {
-					Thread.sleep(FLOOD_PERIOD);
-				} catch (InterruptedException e) {
-					e.printStackTrace();
+				while (true) {
+					Log.d("FlockP2PManager", "flood");
+					flood();
+					try {
+						Thread.sleep(FLOOD_PERIOD);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
 				}
 			}
 		}).start();
@@ -76,18 +80,20 @@ public class FlockP2PManager {
 		new Thread(new Runnable() {
 			@Override
 			public void run() {
-				flood();
-				try {
-					for (PeerGroup group : peerGroupMap.values()) {
-						for (String messageType : group.messageTypeToQueueMap.keySet()) {
-							if (group.hasMessageOfType(messageType)) {
-								group.sendMessagesOfType(messageType, 1);
+				while (true) {
+					try {
+						Log.d("FlockP2PManager", "find normal message to send");
+						for (PeerGroup group : peerGroupMap.values()) {
+							// Send all messages in each group
+							while (true) {
+								if (!group.sendMessage())
+									break;
 							}
 						}
+						Thread.sleep(3000);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
 					}
-					Thread.sleep(3000);
-				} catch (InterruptedException e) {
-					e.printStackTrace();
 				}
 			}
 		}).start();
@@ -105,7 +111,8 @@ public class FlockP2PManager {
 			messageObject.put(MESSAGE_TYPE, messageType);
 			messageObject.put(REQUEST, request);
 			messageObject.put(TIMESTAMP, timestamp);
-			peerGroupMap.get(peerGroupName).addMessageType(messageType);
+			peerGroupMap.get(peerGroupName).addMessageType(messageType,
+					messageTypeToPriorityMap.get(messageType));
 			peerGroupMap.get(peerGroupName).enqueueMessageOfType(messageType,
 					messageObject);
 		} catch (JSONException e) {
@@ -120,7 +127,8 @@ public class FlockP2PManager {
 		peerGroupMap.put(peerGroupName, new PeerGroup(key, peerGroupName,
 				deviceAddresses));
 		for (String messageType : messagePriorityList) {
-			peerGroupMap.get(peerGroupName).addMessageType(messageType);
+			peerGroupMap.get(peerGroupName).addMessageType(messageType,
+					messageTypeToPriorityMap.get(messageType));
 		}
 	}
 
@@ -230,7 +238,7 @@ public class FlockP2PManager {
 		if (!messageTypeToPriorityMap.containsKey(messageType)) {
 			messagePriorityList.add(messageType);
 			for (PeerGroup group : peerGroupMap.values()) {
-				group.addMessageType(messageType);
+				group.addMessageType(messageType, priority);
 			}
 		}
 	}

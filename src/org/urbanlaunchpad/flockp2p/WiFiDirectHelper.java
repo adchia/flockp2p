@@ -32,6 +32,7 @@ import android.net.wifi.p2p.WifiP2pManager.ConnectionInfoListener;
 import android.net.wifi.p2p.WifiP2pManager.PeerListListener;
 import android.os.AsyncTask;
 import android.os.Looper;
+import android.util.Log;
 
 public class WiFiDirectHelper extends BroadcastReceiver implements
 		ChannelListener, ConnectionInfoListener {
@@ -54,6 +55,8 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 	private PeerListListener peerListListener = new PeerListListener() {
 		@Override
 		public void onPeersAvailable(WifiP2pDeviceList peerList) {
+			Log.d("got peer list!", "yay");
+
 			while (!peerGroupQueue.isEmpty()) {
 				PeerGroup group = peerGroupQueue.removeLast();
 				currentMessage = messageQueue.removeLast();
@@ -82,8 +85,6 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 								});
 					}
 				}
-				// Can have JSONObject{encrypted message, peer group id}
-
 			}
 		}
 	};
@@ -98,6 +99,8 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 
 	// 1) Have message to send. Request peer list and save message/group
 	public void sendMessage(JSONObject message, PeerGroup group) {
+		Log.d("SEND_MESSAGE", "sendMessage: " + message.toString() + ", " + group.name);
+		
 		// construct message wrapper
 		try {
 			JSONObject networkMessage = new JSONObject();
@@ -113,7 +116,7 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 
 						@Override
 						public void onSuccess() {
-
+							Log.d("FOUND PEERS", "yay");
 						}
 
 						@Override
@@ -121,6 +124,7 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 							// Code for when the discovery initiation fails goes
 							// here.
 							// Alert the user that something went wrong.
+							Log.d("FOUND PEERS", "nope :(");
 						}
 					});
 		} catch (JSONException e) {
@@ -141,6 +145,8 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 			}
 		} else if (WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION.equals(action)) {
 			// 2) Discovered peers. Need to actually request
+			Log.d("requesting peers", "yay");
+
 			p2pManager.requestPeers(p2pChannel, peerListListener);
 		} else if (WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION
 				.equals(action)) {
@@ -184,6 +190,8 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 				 * Create a server socket and wait for client connections. This
 				 * call blocks until a connection is accepted from a client
 				 */
+				Log.d("RECEIVING MESSAGE", "receiving messages");
+
 				ServerSocket serverSocket = new ServerSocket(8888);
 				Socket client = serverSocket.accept();
 
@@ -201,6 +209,8 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 				String inputStr;
 				while ((inputStr = streamReader.readLine()) != null)
 					responseStrBuilder.append(inputStr);
+				Log.d("RECEIVED MESSAGE", "received message:" + responseStrBuilder.toString());
+
 				JSONObject incomingMessage = new JSONObject(
 						responseStrBuilder.toString());
 
@@ -256,6 +266,7 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 	 */
 	public static void sendMessageThroughSocket(JSONObject message) {
 		Socket socket = new Socket();
+		Log.d("SENDING MESSAGE", "trying to send message");
 
 		try {
 			/**
@@ -273,6 +284,8 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 			 */
 			OutputStream outputStream = socket.getOutputStream();
 			outputStream.write(message.toString().getBytes());
+			Log.d("SENDING MESSAGE", "sent message: " + message.toString());
+
 			outputStream.close();
 		} catch (FileNotFoundException e) {
 			// catch logic
