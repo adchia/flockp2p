@@ -96,25 +96,35 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 
 	// 1) Have message to send. Request peer list and save message/group
 	public void sendMessage(JSONObject message, PeerGroup group) {
-		this.peerGroupQueue.push(group);
-		this.messageQueue.push(message);
+		// construct message wrapper
+		try {
+			JSONObject networkMessage = new JSONObject();
+			networkMessage.put(FlockP2PManager.MESSAGE_JSON, SecurityHelper
+					.encryptMessage(message.toString(), group.key));
+			networkMessage.put(FlockP2PManager.PEER_GROUP_ID, group.name);
+			this.peerGroupQueue.push(group);
+			this.messageQueue.push(networkMessage);
 
-		// Searches for peers. Keeps going until connected or P2P group made
-		p2pManager.discoverPeers(p2pChannel,
-				new WifiP2pManager.ActionListener() {
+			// Searches for peers. Keeps going until connected or P2P group made
+			p2pManager.discoverPeers(p2pChannel,
+					new WifiP2pManager.ActionListener() {
 
-					@Override
-					public void onSuccess() {
+						@Override
+						public void onSuccess() {
 
-					}
+						}
 
-					@Override
-					public void onFailure(int reasonCode) {
-						// Code for when the discovery initiation fails goes
-						// here.
-						// Alert the user that something went wrong.
-					}
-				});
+						@Override
+						public void onFailure(int reasonCode) {
+							// Code for when the discovery initiation fails goes
+							// here.
+							// Alert the user that something went wrong.
+						}
+					});
+		} catch (JSONException e) {
+			e.printStackTrace();
+		}
+
 	}
 
 	@Override
@@ -214,14 +224,23 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 	private static void parseIncomingMessage(JSONObject message) {
 		try {
 			String groupName = message.getString(FlockP2PManager.PEER_GROUP_ID);
-			JSONObject actualMessage = message
-					.getJSONObject(FlockP2PManager.MESSAGE_JSON);
-			String flockMsgType = actualMessage
-					.getString(FlockP2PManager.FLOCK_MESSAGE_TYPE);
-			if (flockMsgType.equals(FlockMessageType.FLOOD.toString())) {
-				// TODO: deal with flood
-			} else if (flockMsgType.equals(FlockMessageType.INCREMENTAL)) {
-				// TODO: deal with incoming
+			// check if in our peer groups
+			if (FlockP2PManager.peerGroupMap.containsKey(groupName)) {
+				// attempt decryption
+				String key = FlockP2PManager.peerGroupMap.get(groupName).key;
+				JSONObject actualMessage = new JSONObject(SecurityHelper.decryptMessage(message.getString(FlockP2PManager.MESSAGE_JSON), key));
+				String flockMsgType = actualMessage
+						.getString(FlockP2PManager.FLOCK_MESSAGE_TYPE);
+				if (flockMsgType.equals(FlockMessageType.FLOOD.toString())) {
+					// TODO: deal with flood
+					// How do we stop this flooding? only flood out in the same peer
+					// group.
+					// We only flood if the message is unique and improves upon the
+					// existing
+					// mapping
+				} else if (flockMsgType.equals(FlockMessageType.INCREMENTAL)) {
+					// TODO: deal with incoming
+				}
 			}
 		} catch (JSONException e) {
 			e.printStackTrace();

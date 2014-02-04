@@ -1,23 +1,23 @@
 package org.urbanlaunchpad.flockp2p;
 
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
-import java.util.PriorityQueue;
 
 import org.json.JSONObject;
 
+import com.google.common.collect.MinMaxPriorityQueue;
+
 public class PeerGroup {
-	private String key;
+	public String key;
 	private HashMap<String, LinkedList<JSONObject>> messageTypeToQueueMap;
 	public HashSet<String> deviceAddresses;
 	public String name;
-	public PriorityQueue<AddressToHopCount> bestPlacesToSend;
+	public MinMaxPriorityQueue<AddressToHopCount> bestPlacesToSend;
 	public static final int MAX_NUM_ADDRESS_HOP_COUNTS = 10;
 	
-	public class AddressToHopCount implements Comparator<AddressToHopCount> {
+	public class AddressToHopCount implements Comparable<AddressToHopCount> {
 		public final String address;
 		public final int hopCount;
 		
@@ -25,12 +25,14 @@ public class PeerGroup {
 			this.address = address;
 			this.hopCount = hopCount;
 		}
-			
+
 		@Override
-		public int compare(AddressToHopCount lhs, AddressToHopCount rhs) {
-			if (rhs.hopCount < lhs.hopCount) return 1;
-	        if (lhs.hopCount == rhs.hopCount) return 0;
-	        return -1;
+		public int compareTo(AddressToHopCount arg0) {
+			if (hopCount < arg0.hopCount)
+				return -1;
+			if (hopCount == arg0.hopCount)
+				return 0;
+			return 1;
 		}
 		
 	}
@@ -40,7 +42,7 @@ public class PeerGroup {
 		this.name = name;
 		messageTypeToQueueMap = new HashMap<String, LinkedList<JSONObject>>();
 		this.deviceAddresses = new HashSet<String>();
-		this.bestPlacesToSend = new PriorityQueue<AddressToHopCount>();
+		this.bestPlacesToSend = MinMaxPriorityQueue.create();
 	}
 	
 	public void receiveFlood(String deviceAddress, int hopCount) {
