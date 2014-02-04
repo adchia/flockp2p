@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -15,6 +14,7 @@ import java.util.LinkedList;
 
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.urbanlaunchpad.flockp2p.FlockP2PManager.FlockMessageType;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -94,7 +94,6 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 		this.p2pChannel = p2pManager.initialize(context, looper, this);
 	}
 
-	// TODO: turn on WiFi Direct
 	// 1) Have message to send. Request peer list and save message/group
 	public void sendMessage(JSONObject message, PeerGroup group) {
 		this.peerGroupQueue.push(group);
@@ -134,8 +133,8 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 		} else if (WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION
 				.equals(action)) {
 			/**
-			 *  4) We requested to connect to someone and here we are!
-			 *  Get connection information 
+			 * 4) We requested to connect to someone and here we are! Get
+			 * connection information
 			 */
 
 			NetworkInfo networkInfo = (NetworkInfo) intent
@@ -192,6 +191,9 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 					responseStrBuilder.append(inputStr);
 				JSONObject incomingMessage = new JSONObject(
 						responseStrBuilder.toString());
+
+				parseIncomingMessage(incomingMessage);
+
 				serverSocket.close();
 				return incomingMessage;
 			} catch (IOException e) {
@@ -204,7 +206,31 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 	}
 
 	/**
+	 * Helper method that parses incoming message and adds to corresponding
+	 * queue
+	 * 
+	 * @param message
+	 */
+	private static void parseIncomingMessage(JSONObject message) {
+		try {
+			String groupName = message.getString(FlockP2PManager.PEER_GROUP_ID);
+			JSONObject actualMessage = message
+					.getJSONObject(FlockP2PManager.MESSAGE_JSON);
+			String flockMsgType = actualMessage
+					.getString(FlockP2PManager.FLOCK_MESSAGE_TYPE);
+			if (flockMsgType.equals(FlockMessageType.FLOOD.toString())) {
+				// TODO: deal with flood
+			} else if (flockMsgType.equals(FlockMessageType.INCREMENTAL)) {
+				// TODO: deal with incoming
+			}
+		} catch (JSONException e) {
+			e.printStackTrace();
+		}
+	}
+
+	/**
 	 * Client-side method that sends message to server
+	 * 
 	 * @param message
 	 */
 	public static void sendMessageThroughSocket(JSONObject message) {
@@ -216,7 +242,8 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 			 * information.
 			 */
 			socket.bind(null);
-			socket.connect((new InetSocketAddress(groupOwnerAddress, CLIENT_PORT)), 500);
+			socket.connect((new InetSocketAddress(groupOwnerAddress,
+					CLIENT_PORT)), 500);
 
 			/**
 			 * Create a byte stream from message and pipe it to the output
@@ -251,12 +278,14 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 
 	/**
 	 * 5) Owner IP is known. Launch server or client threads
-	 * @param info WiFi connection information
+	 * 
+	 * @param info
+	 *            WiFi connection information
 	 */
 	@Override
-	public void onConnectionInfoAvailable(WifiP2pInfo info) {		
+	public void onConnectionInfoAvailable(WifiP2pInfo info) {
 		groupOwnerAddress = info.groupOwnerAddress;
-        
+
 		// This device is server
 		if (info.groupFormed && info.isGroupOwner) {
 			new ServerSocketTask().execute();
