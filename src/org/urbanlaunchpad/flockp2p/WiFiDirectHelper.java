@@ -56,10 +56,13 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 		@Override
 		public void onPeersAvailable(WifiP2pDeviceList peerList) {
 			Log.d("got peer list!", "yay");
+			Log.d("peerGroupQueue is empty?", peerGroupQueue.isEmpty() + "");
 
 			while (!peerGroupQueue.isEmpty()) {
 				PeerGroup group = peerGroupQueue.removeLast();
 				currentMessage = messageQueue.removeLast();
+				Log.d("group.deviceAddresses is empty?", group.deviceAddresses.toString());
+				Log.d("group.deviceAddresses is empty?", group.deviceAddresses.isEmpty() + "");
 
 				// send out message to every device in peer group
 				for (String deviceAddress : group.deviceAddresses) {
@@ -68,6 +71,7 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 					config.wps.setup = WpsInfo.PBC;
 
 					synchronized (mutex) {
+						Log.d("connecting to device!", "yay");
 						// Connects to device.
 						p2pManager.connect(p2pChannel, config,
 								new ActionListener() {
@@ -77,6 +81,7 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 										// WiFiDirectBroadcastReceiver will
 										// notify
 										// us. Ignore for now.
+										Log.d("connected to device!", "yay");
 									}
 
 									@Override
@@ -154,6 +159,8 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 			 * 4) We requested to connect to someone and here we are! Get
 			 * connection information
 			 */
+
+			Log.d("time to get connection info", "yay");
 
 			NetworkInfo networkInfo = (NetworkInfo) intent
 					.getParcelableExtra(WifiP2pManager.EXTRA_NETWORK_INFO);

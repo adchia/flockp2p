@@ -44,7 +44,7 @@ public class PeerGroup {
 		this.name = name;
 		this.messageTypeToQueueMap = new HashMap<String, LinkedList<JSONObject>>();
 		this.messageTypeToPriorityCount = new HashMap<String, Integer>();
-		this.deviceAddresses = new HashSet<String>();
+		this.deviceAddresses = new HashSet<String>(deviceAddresses);
 		this.bestPlacesToSend = MinMaxPriorityQueue.create();
 	}
 
