@@ -10,11 +10,14 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.LinkedList;
+import java.util.Random;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.urbanlaunchpad.flockp2p.FlockP2PManager.FlockMessageType;
+import org.urbanlaunchpad.flockp2p.PeerGroup.AddressToHopCount;
 
 import android.annotation.TargetApi;
 import android.content.BroadcastReceiver;
@@ -56,6 +59,7 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 	private static String mutex = "mutex";
 	private static boolean alreadyConnected = false;
 	private static String otherDeviceAddress;
+	private static Random random = new Random();
 
 	// 3) Listener that is fired when we request and get a peer list
 	private PeerListListener peerListListener = new PeerListListener() {
@@ -66,37 +70,48 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 			while (!peerGroupQueue.isEmpty()) {
 				synchronized (mutex) {
 					if (!alreadyConnected) {
-						PeerGroup group = peerGroupQueue.removeLast();
-						currentMessage = messageQueue.removeLast();
+						PeerGroup group = peerGroupQueue.peekLast();
+						currentMessage = messageQueue.peekLast();
 
-						// send out message to every device in peer group
-						for (final String deviceAddress : group.deviceAddresses) {
-							if (peerList.get(deviceAddress) == null)
-								continue;
-
-							WifiP2pConfig config = new WifiP2pConfig();
-							config.deviceAddress = deviceAddress;
-							config.wps.setup = WpsInfo.PBC;
-
-							Log.d("connecting to device!", "yay");
-							// Connects to device.
-							p2pManager.connect(p2pChannel, config,
-									new ActionListener() {
-
-										@Override
-										public void onSuccess() {
-											otherDeviceAddress = deviceAddress;
-											synchronized (mutex) {
-												alreadyConnected = true;
-											}
-										}
-
-										@Override
-										public void onFailure(int reason) {
-										}
-									});
-
+						// send out message to one of top ten devices in peer
+						// group inversely weighted by hopCounts
+						ArrayList<String> listOfAddresses = new ArrayList<String>();
+						for (AddressToHopCount addressToHopCount : group.bestPlacesToSend) {
+							if (peerList.get(addressToHopCount.address) != null) {
+								for (int i = 0; i < (group.deviceAddresses.size() - addressToHopCount.hopCount); i++) {
+									listOfAddresses
+											.add(addressToHopCount.address);
+								}
+							}
 						}
+
+						int randInt = random.nextInt(listOfAddresses.size());
+						final String deviceAddress = listOfAddresses
+								.get(randInt);
+						WifiP2pConfig config = new WifiP2pConfig();
+						config.deviceAddress = deviceAddress;
+						config.wps.setup = WpsInfo.PBC;
+
+						Log.d("connecting to device!", "yay");
+						// Connects to device.
+						p2pManager.connect(p2pChannel, config,
+								new ActionListener() {
+
+									@Override
+									public void onSuccess() {
+										otherDeviceAddress = deviceAddress;
+										synchronized (mutex) {
+											alreadyConnected = true;
+										}
+										peerGroupQueue.removeLast();
+										currentMessage = messageQueue.removeLast();
+									}
+
+									@Override
+									public void onFailure(int reason) {
+									}
+								});
+
 					}
 				}
 			}
