@@ -16,8 +16,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
 
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
@@ -180,7 +178,7 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 	}
 
 	public void uploadMessage(JSONObject message, PeerGroup group) {
-		Log.d("SEND_MESSAGE", "sendMessage: " + message.toString() + ", "
+		Log.d("UPLOAD_MESSAGE", "sendMessage: " + message.toString() + ", "
 				+ group.name);
 
 		// Submit POST request

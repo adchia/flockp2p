@@ -20,8 +20,8 @@ import android.util.Log;
 
 public class FlockP2PManager {
 	public static WiFiDirectHelper p2pNetworkHelper;
-	public boolean prevConnectedToWiFi = false;
-	public boolean connectedToWiFi = false;
+	public boolean prevConnectedToWiFi = true;
+	public boolean connectedToWiFi = true;
 	public Activity activity;
 	private static int FLOOD_PERIOD = 30000;
 	private final IntentFilter intentFilter = new IntentFilter();
@@ -110,7 +110,8 @@ public class FlockP2PManager {
 								}
 							}
 						} else {
-							Log.d("FlockP2PManager", "find normal message to send");
+							Log.d("FlockP2PManager",
+									"find normal message to send");
 							for (PeerGroup group : peerGroupMap.values()) {
 								// Send all messages in each group
 								while (true) {
@@ -128,15 +129,15 @@ public class FlockP2PManager {
 		}).start();
 	}
 
-	public boolean enqueueMessage(FlockMessageType flockMessageType,
-			String messageType, String request, String peerGroupName) {
+	public boolean enqueueMessage(String messageType, String request,
+			String peerGroupName) {
 
 		// Serialize into JSON Object and add to right linked list
 		try {
 			JSONObject messageObject = new JSONObject();
 			Date timestamp = new Date();
 
-			messageObject.put(FLOCK_MESSAGE_TYPE, flockMessageType);
+			messageObject.put(FLOCK_MESSAGE_TYPE, FlockMessageType.INCREMENTAL);
 			messageObject.put(MESSAGE_TYPE, messageType);
 			messageObject.put(REQUEST, request);
 			messageObject.put(TIMESTAMP, timestamp);
@@ -265,7 +266,7 @@ public class FlockP2PManager {
 			} catch (JSONException e) {
 				e.printStackTrace();
 			}
-		}		
+		}
 		keepFlooding = false;
 	}
 
@@ -278,10 +279,9 @@ public class FlockP2PManager {
 	}
 
 	public void addMessageType(String messageType, Integer priority) {
-		messageTypeToPriorityMap.put(messageType, priority);
-
 		// Check if we already have the key.
 		if (!messageTypeToPriorityMap.containsKey(messageType)) {
+			messageTypeToPriorityMap.put(messageType, priority);
 			messagePriorityList.add(messageType);
 			for (PeerGroup group : peerGroupMap.values()) {
 				group.addMessageType(messageType, priority);
@@ -290,10 +290,9 @@ public class FlockP2PManager {
 	}
 
 	public void removeMessageType(String messageType) {
-		messageTypeToPriorityMap.remove(messageType);
-
 		// Check if we have the key.
 		if (messageTypeToPriorityMap.containsKey(messageType)) {
+			messageTypeToPriorityMap.remove(messageType);
 			messagePriorityList.remove(messageType);
 			for (PeerGroup group : peerGroupMap.values()) {
 				group.removeMessageType(messageType);
