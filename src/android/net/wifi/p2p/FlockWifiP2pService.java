@@ -551,7 +551,7 @@ public class FlockWifiP2pService extends IWifiP2pManager.Stub {
 			addState(mOngoingGroupRemovalState, mGroupCreatedState);
 
 			if (p2pSupported) {
-				setInitialState(mP2pEnabledState);
+				setInitialState(mP2pDisabledState);
 			} else {
 				setInitialState(mP2pNotSupportedState);
 			}
@@ -925,6 +925,13 @@ public class FlockWifiP2pService extends IWifiP2pManager.Stub {
 			public void enter() {
 				if (DBG)
 					logd(getName());
+				try {
+					connectivityServiceReady();
+					mWifiMonitor.startMonitoring();
+					transitionTo(mP2pEnablingState);
+				} catch (IllegalStateException ie) {
+					loge("Unable to change interface settings: " + ie);
+				}
 			}
 
 			@Override
@@ -933,15 +940,6 @@ public class FlockWifiP2pService extends IWifiP2pManager.Stub {
 					logd(getName() + message.toString());
 				switch (message.what) {
 				case WifiStateMachine.CMD_ENABLE_P2P:
-					try {
-						mNwService.setInterfaceUp(mInterface);
-					} catch (RemoteException re) {
-						loge("Unable to change interface settings: " + re);
-					} catch (IllegalStateException ie) {
-						loge("Unable to change interface settings: " + ie);
-					}
-					mWifiMonitor.startMonitoring();
-					transitionTo(mP2pEnablingState);
 					break;
 				default:
 					return NOT_HANDLED;
@@ -1075,15 +1073,11 @@ public class FlockWifiP2pService extends IWifiP2pManager.Stub {
 					// do not send service discovery request while normal find
 					// operation.
 					clearSupplicantServiceRequest();
-					if (mWifiNative.p2pFind(DISCOVER_TIMEOUT_S)) {
+					mWifiNative.p2pFind(DISCOVER_TIMEOUT_S);
 						replyToMessage(message,
 								FlockWifiP2pManager.DISCOVER_PEERS_SUCCEEDED);
 						sendP2pDiscoveryChangedBroadcast(true);
-					} else {
-						replyToMessage(message,
-								FlockWifiP2pManager.DISCOVER_PEERS_FAILED,
-								FlockWifiP2pManager.ERROR);
-					}
+					
 					break;
 				case WifiMonitor.P2P_FIND_STOPPED_EVENT:
 					sendP2pDiscoveryChangedBroadcast(false);

@@ -16,6 +16,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.urbanlaunchpad.flockp2p.FlockP2PManager.FlockMessageType;
 
+import android.annotation.TargetApi;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -30,14 +31,15 @@ import android.net.wifi.p2p.WifiP2pConfig;
 import android.net.wifi.p2p.WifiP2pDeviceList;
 import android.net.wifi.p2p.WifiP2pInfo;
 import android.net.wifi.p2p.WifiP2pManager;
-import android.net.wifi.p2p.WifiP2pManager.ChannelListener;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Looper;
 import android.util.Log;
 
+@TargetApi(Build.VERSION_CODES.JELLY_BEAN_MR2)
 public class WiFiDirectHelper extends BroadcastReceiver implements
-		ConnectionInfoListener,
-		FlockWifiP2pManager.ChannelListener {
+		ConnectionInfoListener, FlockWifiP2pManager.ChannelListener,
+		WifiP2pManager.ChannelListener {
 	private FlockWifiP2pManager p2pManager;
 	private Channel p2pChannel;
 	private final static int CLIENT_PORT = 8988;
@@ -59,6 +61,8 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 		public void onPeersAvailable(WifiP2pDeviceList peerList) {
 			Log.d("got peer list!", "yay");
 			Log.d("peerGroupQueue is empty?", peerGroupQueue.isEmpty() + "");
+			Log.d("peerlist: ", peerList.toString());
+			Log.d("peerlist: ", "tests");
 
 			while (!peerGroupQueue.isEmpty()) {
 				PeerGroup group = peerGroupQueue.removeLast();
@@ -70,6 +74,9 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 
 				// send out message to every device in peer group
 				for (String deviceAddress : group.deviceAddresses) {
+					if (peerList.get(deviceAddress) == null)
+						continue;
+
 					WifiP2pConfig config = new WifiP2pConfig();
 					config.deviceAddress = deviceAddress;
 					config.wps.setup = WpsInfo.PBC;
@@ -77,38 +84,35 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 					synchronized (mutex) {
 						Log.d("connecting to device!", "yay");
 						// Connects to device.
-						oldP2pManager.connect(oldP2pChannel, config, null);
-//						p2pManager.connect(p2pChannel, config,
-//								new ActionListener() {
-//
-//									@Override
-//									public void onSuccess() {
-//										// WiFiDirectBroadcastReceiver will
-//										// notify
-//										// us. Ignore for now.
-//										Log.d("connected to device!", "yay");
-//									}
-//
-//									@Override
-//									public void onFailure(int reason) {
-//									}
-//								});
+						p2pManager.connect(p2pChannel, config,
+								new ActionListener() {
+
+									@Override
+									public void onSuccess() {
+										// WiFiDirectBroadcastReceiver will
+										// notify
+										// us. Ignore for now.
+										Log.d("connected to device!", "yay");
+									}
+
+									@Override
+									public void onFailure(int reason) {
+									}
+								});
 					}
 				}
 			}
 		}
 	};
-	private WifiP2pManager oldP2pManager;
-	private android.net.wifi.p2p.WifiP2pManager.Channel oldP2pChannel;
 
-	public WiFiDirectHelper(Context context, Looper looper, WifiP2pManager oldP2pManager) {
+	public WiFiDirectHelper(Context context, Looper looper,
+			WifiP2pManager oldP2pManager) {
+		oldP2pManager.initialize(context, looper, null);
 		this.p2pManager = new FlockWifiP2pManager(context, this);
 		Log.d("initializing", "initializing");
 		this.p2pChannel = this.p2pManager.initialize(context, looper, this);
 		this.peerGroupQueue = new LinkedList<PeerGroup>();
 		this.messageQueue = new LinkedList<JSONObject>();
-		this.oldP2pManager = oldP2pManager;
-		this.oldP2pChannel = oldP2pManager.initialize(context, looper, (ChannelListener) this);
 	}
 
 	// 1) Have message to send. Request peer list and save message/group
@@ -125,39 +129,25 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 			this.peerGroupQueue.push(group);
 			this.messageQueue.push(networkMessage);
 
-			oldP2pManager.discoverPeers(oldP2pChannel, new WifiP2pManager.ActionListener() {
+			p2pManager.discoverPeers(p2pChannel,
+					new FlockWifiP2pManager.ActionListener() {
 
-				@Override
-				public void onSuccess() {
-					Log.d("FOUND PEERS", "yay");
-					// Searches for peers. Keeps going until connected or P2P group made
-					p2pManager.discoverPeers(p2pChannel,
-							new FlockWifiP2pManager.ActionListener() {
+						@Override
+						public void onSuccess() {
+							Log.d("FOUND PEERS", "yay");
+						}
 
-								@Override
-								public void onSuccess() {
-									Log.d("FOUND PEERS", "yay");
-								}
+						@Override
+						public void onFailure(int reasonCode) {
+							// Code for when the discovery
+							// initiation fails goes
+							// here.
+							// Alert the user that something
+							// went wrong.
+							Log.d("FOUND PEERS", "nope :( " + reasonCode);
+						}
+					});
 
-								@Override
-								public void onFailure(int reasonCode) {
-									// Code for when the discovery initiation fails goes
-									// here.
-									// Alert the user that something went wrong.
-									Log.d("FOUND PEERS", "nope :( " + reasonCode);
-								}
-							});
-				}
-
-				@Override
-				public void onFailure(int reasonCode) {
-					// Code for when the discovery initiation fails goes
-					// here.
-					// Alert the user that something went wrong.
-					Log.d("FOUND PEERS", "really nope :( " + reasonCode);
-				}
-			});
-			
 		} catch (JSONException e) {
 			e.printStackTrace();
 		}

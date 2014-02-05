@@ -48,6 +48,11 @@ public class FlockP2PManager {
 	}
 
 	public FlockP2PManager(Activity activity) {
+		// turn on wifi direct
+		WifiManager wifiManager = (WifiManager) activity
+				.getSystemService(Context.WIFI_SERVICE);
+		wifiManager.setWifiEnabled(true);
+		
 		this.activity = activity;
 		FlockP2PManager.p2pNetworkHelper = new WiFiDirectHelper(activity,
 				activity.getMainLooper(), (android.net.wifi.p2p.WifiP2pManager) activity
@@ -64,10 +69,7 @@ public class FlockP2PManager {
         intentFilter.addAction(FlockWifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION);
         activity.registerReceiver(p2pNetworkHelper, intentFilter);
         
-		// turn on wifi direct
-		WifiManager wifiManager = (WifiManager) activity
-				.getSystemService(Context.WIFI_SERVICE);
-		wifiManager.setWifiEnabled(true);
+
 
 		// turn on periodic flooding
 		new Thread(new Runnable() {
