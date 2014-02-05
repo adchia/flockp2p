@@ -11,11 +11,10 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.LinkedList;
-
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.urbanlaunchpad.flockp2p.FlockP2PManager.FlockMessageType;
-
+import android.annotation.TargetApi;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -24,21 +23,22 @@ import android.net.wifi.WpsInfo;
 import android.net.wifi.p2p.WifiP2pConfig;
 import android.net.wifi.p2p.WifiP2pDeviceList;
 import android.net.wifi.p2p.WifiP2pInfo;
-import android.net.wifi.p2p.FlockWifiP2pManager;
-import android.net.wifi.p2p.FlockWifiP2pManager.ActionListener;
-import android.net.wifi.p2p.FlockWifiP2pManager.Channel;
-import android.net.wifi.p2p.FlockWifiP2pManager.ChannelListener;
-import android.net.wifi.p2p.FlockWifiP2pManager.ConnectionInfoListener;
-import android.net.wifi.p2p.FlockWifiP2pManager.PeerListListener;
 import android.net.wifi.p2p.WifiP2pManager;
+import android.net.wifi.p2p.WifiP2pManager.ActionListener;
+import android.net.wifi.p2p.WifiP2pManager.Channel;
+import android.net.wifi.p2p.WifiP2pManager.ChannelListener;
+import android.net.wifi.p2p.WifiP2pManager.ConnectionInfoListener;
+import android.net.wifi.p2p.WifiP2pManager.PeerListListener;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Looper;
 import android.util.Log;
 
+@TargetApi(Build.VERSION_CODES.JELLY_BEAN_MR2)
 public class WiFiDirectHelper extends BroadcastReceiver implements
 		ConnectionInfoListener,
-		FlockWifiP2pManager.ChannelListener {
-	private FlockWifiP2pManager p2pManager;
+		ChannelListener {
+	private WifiP2pManager p2pManager;
 	private Channel p2pChannel;
 	private final static int CLIENT_PORT = 8988;
 
@@ -67,9 +67,13 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 						group.deviceAddresses.toString());
 				Log.d("group.deviceAddresses is empty?",
 						group.deviceAddresses.isEmpty() + "");
+				Log.d("peerList: ", peerList.getDeviceList().toString());
 
 				// send out message to every device in peer group
 				for (String deviceAddress : group.deviceAddresses) {
+					if (peerList.get(deviceAddress) == null)
+						continue;
+					
 					WifiP2pConfig config = new WifiP2pConfig();
 					config.deviceAddress = deviceAddress;
 					config.wps.setup = WpsInfo.PBC;
@@ -98,8 +102,8 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 		}
 	};
 
-	public WiFiDirectHelper(Context context, Looper looper) {
-		this.p2pManager = new FlockWifiP2pManager(context);
+	public WiFiDirectHelper(Context context, Looper looper, WifiP2pManager manager) {
+		this.p2pManager = manager;
 		Log.d("initializing", "initializing");
 		this.p2pChannel = this.p2pManager.initialize(context, looper, this);
 		this.peerGroupQueue = new LinkedList<PeerGroup>();
@@ -122,7 +126,7 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 
 			// Searches for peers. Keeps going until connected or P2P group made
 			p2pManager.discoverPeers(p2pChannel,
-					new FlockWifiP2pManager.ActionListener() {
+					new ActionListener() {
 
 						@Override
 						public void onSuccess() {
@@ -146,21 +150,21 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 	@Override
 	public void onReceive(Context context, Intent intent) {
 		String action = intent.getAction();
-		if (FlockWifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION.equals(action)) {
+		if (WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION.equals(action)) {
 			int state = intent.getIntExtra(
-					FlockWifiP2pManager.EXTRA_WIFI_STATE, -1);
-			if (state == FlockWifiP2pManager.WIFI_P2P_STATE_ENABLED) {
+					WifiP2pManager.EXTRA_WIFI_STATE, -1);
+			if (state == WifiP2pManager.WIFI_P2P_STATE_ENABLED) {
 				// TODO: notify application WiFi P2P is good to go
 			} else {
 				// TODO: notify application we need WiFi P2P
 			}
-		} else if (FlockWifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION
+		} else if (WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION
 				.equals(action)) {
 			// 2) Discovered peers. Need to actually request
 			Log.d("requesting peers", "yay");
 
 			p2pManager.requestPeers(p2pChannel, peerListListener);
-		} else if (FlockWifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION
+		} else if (WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION
 				.equals(action)) {
 			/**
 			 * 4) We requested to connect to someone and here we are! Get
@@ -170,7 +174,7 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 			Log.d("time to get connection info", "yay");
 
 			NetworkInfo networkInfo = (NetworkInfo) intent
-					.getParcelableExtra(FlockWifiP2pManager.EXTRA_NETWORK_INFO);
+					.getParcelableExtra(WifiP2pManager.EXTRA_NETWORK_INFO);
 
 			if (networkInfo.isConnected()) {
 				// we are connected with the other device, request connection
