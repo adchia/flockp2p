@@ -15,6 +15,7 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
+import android.net.wifi.p2p.FlockWifiP2pManager;
 import android.net.wifi.p2p.WifiP2pManager;
 import android.util.Log;
 
@@ -50,18 +51,16 @@ public class FlockP2PManager {
 	public FlockP2PManager(Activity activity) {
 		this.activity = activity;
 		p2pNetworkHelper = new WiFiDirectHelper(activity,
-				activity.getMainLooper(),
-				(WifiP2pManager) activity
-						.getSystemService(Context.WIFI_P2P_SERVICE));
+				activity.getMainLooper());
 		messageTypeToPriorityMap = new HashMap<String, Integer>();
 		messagePriorityList = new ArrayList<String>();
 		peerGroupMap = new HashMap<String, PeerGroup>();
 
 		// add necessary intent values to be matched and register
-        intentFilter.addAction(WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION);
-        intentFilter.addAction(WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION);
-        intentFilter.addAction(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION);
-        intentFilter.addAction(WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION);
+        intentFilter.addAction(FlockWifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION);
+        intentFilter.addAction(FlockWifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION);
+        intentFilter.addAction(FlockWifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION);
+        intentFilter.addAction(FlockWifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION);
         activity.registerReceiver(p2pNetworkHelper, intentFilter);
         
 		// turn on wifi direct

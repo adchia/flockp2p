@@ -29,7 +29,7 @@ import android.util.LruCache;
  * {@see WifiP2pManager}
  * @hide
  */
-public class WifiP2pGroupList implements Parcelable {
+public class FlockWifiP2pGroupList implements Parcelable {
 
     private static final int CREDENTIAL_MAX_NUM             =   32;
 
@@ -42,11 +42,11 @@ public class WifiP2pGroupList implements Parcelable {
         public void onDeleteGroup(int netId);
     }
 
-    WifiP2pGroupList() {
+    FlockWifiP2pGroupList() {
         this(null, null);
     }
 
-    WifiP2pGroupList(WifiP2pGroupList source, GroupDeleteListener listener) {
+    FlockWifiP2pGroupList(FlockWifiP2pGroupList source, GroupDeleteListener listener) {
         mListener = listener;
         mGroups = new LruCache<Integer, WifiP2pGroup>(CREDENTIAL_MAX_NUM) {
             @Override
@@ -218,10 +218,10 @@ public class WifiP2pGroupList implements Parcelable {
     }
 
     /** Implement the Parcelable interface */
-    public static final Creator<WifiP2pGroupList> CREATOR =
-        new Creator<WifiP2pGroupList>() {
-            public WifiP2pGroupList createFromParcel(Parcel in) {
-                WifiP2pGroupList grpList = new WifiP2pGroupList();
+    public static final Creator<FlockWifiP2pGroupList> CREATOR =
+        new Creator<FlockWifiP2pGroupList>() {
+            public FlockWifiP2pGroupList createFromParcel(Parcel in) {
+                FlockWifiP2pGroupList grpList = new FlockWifiP2pGroupList();
 
                 int deviceCount = in.readInt();
                 for (int i = 0; i < deviceCount; i++) {
@@ -230,8 +230,8 @@ public class WifiP2pGroupList implements Parcelable {
                 return grpList;
             }
 
-            public WifiP2pGroupList[] newArray(int size) {
-                return new WifiP2pGroupList[size];
+            public FlockWifiP2pGroupList[] newArray(int size) {
+                return new FlockWifiP2pGroupList[size];
             }
         };
 }

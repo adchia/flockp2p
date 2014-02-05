@@ -16,13 +16,13 @@
 
 package android.net.wifi.p2p.nsd;
 
-import android.net.wifi.p2p.WifiP2pManager;
+import android.net.wifi.p2p.FlockWifiP2pManager;
 
 import java.util.Locale;
 
 /**
  * A class for creating a Upnp service discovery request for use with
- * {@link WifiP2pManager#addServiceRequest} and {@link WifiP2pManager#removeServiceRequest}
+ * {@link FlockWifiP2pManager#addServiceRequest} and {@link FlockWifiP2pManager#removeServiceRequest}
  *
  * {@see WifiP2pManager}
  * {@see WifiP2pServiceRequest}
