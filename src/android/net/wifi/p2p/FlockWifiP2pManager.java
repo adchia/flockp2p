@@ -21,6 +21,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.urbanlaunchpad.flockp2p.WiFiDirectHelper;
+
 import android.annotation.SdkConstant;
 import android.annotation.SdkConstant.SdkConstantType;
 import android.annotation.TargetApi;
@@ -304,7 +306,7 @@ public class FlockWifiP2pManager {
 	 */
 	public static final String WIFI_P2P_PERSISTENT_GROUPS_CHANGED_ACTION = "android.net.wifi.p2p.PERSISTENT_GROUPS_CHANGED";
 
-	IWifiP2pManager mService;
+	FlockWifiP2pService mService;
 
 	private static final int BASE = Protocol.BASE_WIFI_P2P_MANAGER;
 
@@ -474,24 +476,6 @@ public class FlockWifiP2pManager {
 	/** @hide */
 	public static final int SET_CHANNEL_SUCCEEDED = BASE + 73;
 
-	/**
-	 * Create a new WifiP2pManager instance. Applications use
-	 * {@link android.content.Context#getSystemService
-	 * Context.getSystemService()} to retrieve the standard
-	 * {@link android.content.Context#WIFI_P2P_SERVICE Context.WIFI_P2P_SERVICE}
-	 * .
-	 * 
-	 * @param service
-	 *            the Binder interface
-	 * @hide - hide this because it takes in a parameter of type
-	 *       IWifiP2pManager, which is a system private class.
-	 */
-	public FlockWifiP2pManager(IWifiP2pManager service) {
-		mService = service;
-	}
-
-	
-
 	public FlockWifiP2pManager(WifiP2pManager manager) {
 		// use reflection to initialize service
 		Field f;
@@ -512,10 +496,11 @@ public class FlockWifiP2pManager {
 		}
 	}
 
-	public FlockWifiP2pManager(Context c) {
+	public FlockWifiP2pManager(Context c, WiFiDirectHelper wiFiDirectHelper) {
 		mService = new FlockWifiP2pService(c);
+		mService.broadcastReceiver = wiFiDirectHelper;
 	}
-	
+
 	/**
 	 * Passed with {@link ActionListener#onFailure}. Indicates that the
 	 * operation failed due to an internal error.
@@ -946,6 +931,8 @@ public class FlockWifiP2pManager {
 			return null;
 
 		Channel c = new Channel(srcContext, srcLooper, listener);
+		mService.mWifiChannel = c.mAsyncChannel;
+
 		if (c.mAsyncChannel.connectSync(srcContext, c.mHandler, messenger) == AsyncChannel.STATUS_SUCCESSFUL) {
 			return c;
 		} else {
@@ -1513,11 +1500,7 @@ public class FlockWifiP2pManager {
 
 	/** Internal use only @hide */
 	public void setMiracastMode(int mode) {
-		try {
-			mService.setMiracastMode(mode);
-		} catch (RemoteException e) {
-			// ignore
-		}
+		mService.setMiracastMode(mode);
 	}
 
 	/**
@@ -1528,12 +1511,8 @@ public class FlockWifiP2pManager {
 	 * @hide
 	 */
 	public Messenger getMessenger() {
-		try {
-			Log.d("test", "test");
-			return mService.getMessenger();
-		} catch (RemoteException e) {
-			return null;
-		}
+		Log.d("test", "test");
+		return mService.getMessenger();
 	}
 
 }

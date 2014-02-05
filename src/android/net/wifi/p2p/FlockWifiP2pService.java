@@ -26,9 +26,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 
+import org.urbanlaunchpad.flockp2p.FlockP2PManager;
+
 import android.annotation.TargetApi;
 import android.app.AlertDialog;
 import android.app.Notification;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.DialogInterface.OnClickListener;
@@ -59,7 +62,6 @@ import android.os.Message;
 import android.os.Messenger;
 import android.os.RemoteException;
 import android.os.ServiceManager;
-import android.os.UserHandle;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.Log;
@@ -102,10 +104,11 @@ public class FlockWifiP2pService extends IWifiP2pManager.Stub {
 
 	INetworkManagementService mNwService;
 	private DhcpStateMachine mDhcpStateMachine;
+	public BroadcastReceiver broadcastReceiver;
 
 	private P2pStateMachine mP2pStateMachine;
 	private AsyncChannel mReplyChannel = new AsyncChannel();
-	private AsyncChannel mWifiChannel;
+	public AsyncChannel mWifiChannel;
 
 	private static final Boolean JOIN_GROUP = true;
 	private static final Boolean FORM_GROUP = false;
@@ -338,12 +341,12 @@ public class FlockWifiP2pService extends IWifiP2pManager.Stub {
 		mP2pStateMachine = new P2pStateMachine(TAG, mP2pSupported);
 		mP2pStateMachine.start();
 	}
-	
+
 	public FlockWifiP2pService() {
 		// Get system service for wifi p2p
 		WifiP2pService oldService = null;
 		IBinder binder = ServiceManager.getService(Context.WIFI_P2P_SERVICE);
-		
+
 		// Use reflection to copy over all fields
 		this.mInterface = "p2p0";
 		this.mContext = (Context) getField("mContext", oldService);
@@ -2321,20 +2324,29 @@ public class FlockWifiP2pService extends IWifiP2pManager.Stub {
 				intent.putExtra(FlockWifiP2pManager.EXTRA_WIFI_STATE,
 						FlockWifiP2pManager.WIFI_P2P_STATE_DISABLED);
 			}
-			try {
-				mContext.sendStickyBroadcastAsUser(intent,
-						(UserHandle) UserHandle.class.getDeclaredField("ALL")
-								.get(null));
-			} catch (IllegalArgumentException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} catch (IllegalAccessException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} catch (NoSuchFieldException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+
+			if (broadcastReceiver == null) {
+				Log.d(":((((", ":((((");
+			} else {
+				Log.d(":)))", ":)))");
 			}
+
+			broadcastReceiver.onReceive(mContext, intent);
+			//
+			// try {
+			// mContext.sendStickyBroadcastAsUser(intent,
+			// (UserHandle) UserHandle.class.getDeclaredField("ALL")
+			// .get(null));
+			// } catch (IllegalArgumentException e) {
+			// // TODO Auto-generated catch block
+			// e.printStackTrace();
+			// } catch (IllegalAccessException e) {
+			// // TODO Auto-generated catch block
+			// e.printStackTrace();
+			// } catch (NoSuchFieldException e) {
+			// // TODO Auto-generated catch block
+			// e.printStackTrace();
+			// }
 		}
 
 		private void sendP2pDiscoveryChangedBroadcast(boolean started) {
@@ -2351,42 +2363,44 @@ public class FlockWifiP2pService extends IWifiP2pManager.Stub {
 			intent.putExtra(FlockWifiP2pManager.EXTRA_DISCOVERY_STATE,
 					started ? FlockWifiP2pManager.WIFI_P2P_DISCOVERY_STARTED
 							: FlockWifiP2pManager.WIFI_P2P_DISCOVERY_STOPPED);
-			try {
-				mContext.sendStickyBroadcastAsUser(intent,
-						(UserHandle) UserHandle.class.getDeclaredField("ALL")
-								.get(null));
-			} catch (IllegalArgumentException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} catch (IllegalAccessException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} catch (NoSuchFieldException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+			broadcastReceiver.onReceive(mContext, intent);
+
+			// try {
+			// mContext.sendStickyBroadcastAsUser(intent,
+			// (UserHandle) UserHandle.class.getDeclaredField("ALL")
+			// .get(null));
+			// } catch (IllegalArgumentException e) {
+			// // TODO Auto-generated catch block
+			// e.printStackTrace();
+			// } catch (IllegalAccessException e) {
+			// // TODO Auto-generated catch block
+			// e.printStackTrace();
+			// } catch (NoSuchFieldException e) {
+			// // TODO Auto-generated catch block
+			// e.printStackTrace();
+			// }
 		}
 
 		private void sendThisDeviceChangedBroadcast() {
-			final Intent intent = new Intent(
-					FlockWifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION);
-			intent.addFlags(FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
-			intent.putExtra(FlockWifiP2pManager.EXTRA_WIFI_P2P_DEVICE,
-					new WifiP2pDevice(mThisDevice));
-			try {
-				mContext.sendStickyBroadcastAsUser(intent,
-						(UserHandle) UserHandle.class.getDeclaredField("ALL")
-								.get(null));
-			} catch (IllegalArgumentException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} catch (IllegalAccessException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} catch (NoSuchFieldException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+			// final Intent intent = new Intent(
+			// FlockWifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION);
+			// intent.addFlags(FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
+			// intent.putExtra(FlockWifiP2pManager.EXTRA_WIFI_P2P_DEVICE,
+			// new WifiP2pDevice(mThisDevice));
+			// try {
+			// mContext.sendStickyBroadcastAsUser(intent,
+			// (UserHandle) UserHandle.class.getDeclaredField("ALL")
+			// .get(null));
+			// } catch (IllegalArgumentException e) {
+			// // TODO Auto-generated catch block
+			// e.printStackTrace();
+			// } catch (IllegalAccessException e) {
+			// // TODO Auto-generated catch block
+			// e.printStackTrace();
+			// } catch (NoSuchFieldException e) {
+			// // TODO Auto-generated catch block
+			// e.printStackTrace();
+			// }
 		}
 
 		private void sendPeersChangedBroadcast() {
@@ -2395,20 +2409,22 @@ public class FlockWifiP2pService extends IWifiP2pManager.Stub {
 			intent.putExtra(FlockWifiP2pManager.EXTRA_P2P_DEVICE_LIST,
 					new WifiP2pDeviceList(mPeers));
 			intent.addFlags(FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
-			try {
-				mContext.sendBroadcastAsUser(intent,
-						(UserHandle) UserHandle.class.getDeclaredField("ALL")
-								.get(null));
-			} catch (IllegalArgumentException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} catch (IllegalAccessException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} catch (NoSuchFieldException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+			broadcastReceiver.onReceive(mContext, intent);
+
+			// try {
+			// mContext.sendBroadcastAsUser(intent,
+			// (UserHandle) UserHandle.class.getDeclaredField("ALL")
+			// .get(null));
+			// } catch (IllegalArgumentException e) {
+			// // TODO Auto-generated catch block
+			// e.printStackTrace();
+			// } catch (IllegalAccessException e) {
+			// // TODO Auto-generated catch block
+			// e.printStackTrace();
+			// } catch (NoSuchFieldException e) {
+			// // TODO Auto-generated catch block
+			// e.printStackTrace();
+			// }
 		}
 
 		private void sendP2pConnectionChangedBroadcast() {
@@ -2424,23 +2440,27 @@ public class FlockWifiP2pService extends IWifiP2pManager.Stub {
 					new NetworkInfo(mNetworkInfo));
 			intent.putExtra(FlockWifiP2pManager.EXTRA_WIFI_P2P_GROUP,
 					new WifiP2pGroup(mGroup));
-			try {
-				mContext.sendStickyBroadcastAsUser(intent,
-						(UserHandle) UserHandle.class.getDeclaredField("ALL")
-								.get(null));
-			} catch (IllegalArgumentException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} catch (IllegalAccessException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} catch (NoSuchFieldException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+			broadcastReceiver.onReceive(mContext, intent);
+			//
+			// try {
+			// mContext.sendStickyBroadcastAsUser(intent,
+			// (UserHandle) UserHandle.class.getDeclaredField("ALL")
+			// .get(null));
+			// } catch (IllegalArgumentException e) {
+			// // TODO Auto-generated catch block
+			// e.printStackTrace();
+			// } catch (IllegalAccessException e) {
+			// // TODO Auto-generated catch block
+			// e.printStackTrace();
+			// } catch (NoSuchFieldException e) {
+			// // TODO Auto-generated catch block
+			// e.printStackTrace();
+			// }
+			if (mWifiChannel != null) {
+				mWifiChannel.sendMessage(
+						FlockWifiP2pService.P2P_CONNECTION_CHANGED,
+						new NetworkInfo(mNetworkInfo));
 			}
-			mWifiChannel.sendMessage(
-					FlockWifiP2pService.P2P_CONNECTION_CHANGED,
-					new NetworkInfo(mNetworkInfo));
 		}
 
 		private void sendP2pPersistentGroupsChangedBroadcast() {
@@ -2449,20 +2469,22 @@ public class FlockWifiP2pService extends IWifiP2pManager.Stub {
 			Intent intent = new Intent(
 					FlockWifiP2pManager.WIFI_P2P_PERSISTENT_GROUPS_CHANGED_ACTION);
 			intent.addFlags(FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
-			try {
-				mContext.sendStickyBroadcastAsUser(intent,
-						(UserHandle) UserHandle.class.getDeclaredField("ALL")
-								.get(null));
-			} catch (IllegalArgumentException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} catch (IllegalAccessException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} catch (NoSuchFieldException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+			broadcastReceiver.onReceive(mContext, intent);
+			//
+			// try {
+			// mContext.sendStickyBroadcastAsUser(intent,
+			// (UserHandle) UserHandle.class.getDeclaredField("ALL")
+			// .get(null));
+			// } catch (IllegalArgumentException e) {
+			// // TODO Auto-generated catch block
+			// e.printStackTrace();
+			// } catch (IllegalAccessException e) {
+			// // TODO Auto-generated catch block
+			// e.printStackTrace();
+			// } catch (NoSuchFieldException e) {
+			// // TODO Auto-generated catch block
+			// e.printStackTrace();
+			// }
 		}
 
 		private void startDhcpServer(String intf) {

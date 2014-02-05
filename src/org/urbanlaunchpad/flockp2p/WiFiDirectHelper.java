@@ -21,16 +21,16 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.NetworkInfo;
 import android.net.wifi.WpsInfo;
-import android.net.wifi.p2p.WifiP2pConfig;
-import android.net.wifi.p2p.WifiP2pDeviceList;
-import android.net.wifi.p2p.WifiP2pInfo;
 import android.net.wifi.p2p.FlockWifiP2pManager;
 import android.net.wifi.p2p.FlockWifiP2pManager.ActionListener;
 import android.net.wifi.p2p.FlockWifiP2pManager.Channel;
-import android.net.wifi.p2p.FlockWifiP2pManager.ChannelListener;
 import android.net.wifi.p2p.FlockWifiP2pManager.ConnectionInfoListener;
 import android.net.wifi.p2p.FlockWifiP2pManager.PeerListListener;
+import android.net.wifi.p2p.WifiP2pConfig;
+import android.net.wifi.p2p.WifiP2pDeviceList;
+import android.net.wifi.p2p.WifiP2pInfo;
 import android.net.wifi.p2p.WifiP2pManager;
+import android.net.wifi.p2p.WifiP2pManager.ChannelListener;
 import android.os.AsyncTask;
 import android.os.Looper;
 import android.util.Log;
@@ -77,33 +77,38 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 					synchronized (mutex) {
 						Log.d("connecting to device!", "yay");
 						// Connects to device.
-						p2pManager.connect(p2pChannel, config,
-								new ActionListener() {
-
-									@Override
-									public void onSuccess() {
-										// WiFiDirectBroadcastReceiver will
-										// notify
-										// us. Ignore for now.
-										Log.d("connected to device!", "yay");
-									}
-
-									@Override
-									public void onFailure(int reason) {
-									}
-								});
+						oldP2pManager.connect(oldP2pChannel, config, null);
+//						p2pManager.connect(p2pChannel, config,
+//								new ActionListener() {
+//
+//									@Override
+//									public void onSuccess() {
+//										// WiFiDirectBroadcastReceiver will
+//										// notify
+//										// us. Ignore for now.
+//										Log.d("connected to device!", "yay");
+//									}
+//
+//									@Override
+//									public void onFailure(int reason) {
+//									}
+//								});
 					}
 				}
 			}
 		}
 	};
+	private WifiP2pManager oldP2pManager;
+	private android.net.wifi.p2p.WifiP2pManager.Channel oldP2pChannel;
 
-	public WiFiDirectHelper(Context context, Looper looper) {
-		this.p2pManager = new FlockWifiP2pManager(context);
+	public WiFiDirectHelper(Context context, Looper looper, WifiP2pManager oldP2pManager) {
+		this.p2pManager = new FlockWifiP2pManager(context, this);
 		Log.d("initializing", "initializing");
 		this.p2pChannel = this.p2pManager.initialize(context, looper, this);
 		this.peerGroupQueue = new LinkedList<PeerGroup>();
 		this.messageQueue = new LinkedList<JSONObject>();
+		this.oldP2pManager = oldP2pManager;
+		this.oldP2pChannel = oldP2pManager.initialize(context, looper, (ChannelListener) this);
 	}
 
 	// 1) Have message to send. Request peer list and save message/group
@@ -120,23 +125,39 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 			this.peerGroupQueue.push(group);
 			this.messageQueue.push(networkMessage);
 
-			// Searches for peers. Keeps going until connected or P2P group made
-			p2pManager.discoverPeers(p2pChannel,
-					new FlockWifiP2pManager.ActionListener() {
+			oldP2pManager.discoverPeers(oldP2pChannel, new WifiP2pManager.ActionListener() {
 
-						@Override
-						public void onSuccess() {
-							Log.d("FOUND PEERS", "yay");
-						}
+				@Override
+				public void onSuccess() {
+					Log.d("FOUND PEERS", "yay");
+					// Searches for peers. Keeps going until connected or P2P group made
+					p2pManager.discoverPeers(p2pChannel,
+							new FlockWifiP2pManager.ActionListener() {
 
-						@Override
-						public void onFailure(int reasonCode) {
-							// Code for when the discovery initiation fails goes
-							// here.
-							// Alert the user that something went wrong.
-							Log.d("FOUND PEERS", "nope :( " + reasonCode);
-						}
-					});
+								@Override
+								public void onSuccess() {
+									Log.d("FOUND PEERS", "yay");
+								}
+
+								@Override
+								public void onFailure(int reasonCode) {
+									// Code for when the discovery initiation fails goes
+									// here.
+									// Alert the user that something went wrong.
+									Log.d("FOUND PEERS", "nope :( " + reasonCode);
+								}
+							});
+				}
+
+				@Override
+				public void onFailure(int reasonCode) {
+					// Code for when the discovery initiation fails goes
+					// here.
+					// Alert the user that something went wrong.
+					Log.d("FOUND PEERS", "really nope :( " + reasonCode);
+				}
+			});
+			
 		} catch (JSONException e) {
 			e.printStackTrace();
 		}

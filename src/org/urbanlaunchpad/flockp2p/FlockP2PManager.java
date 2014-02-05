@@ -16,7 +16,6 @@ import android.net.NetworkInfo;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.net.wifi.p2p.FlockWifiP2pManager;
-import android.net.wifi.p2p.WifiP2pManager;
 import android.util.Log;
 
 public class FlockP2PManager {
@@ -50,8 +49,10 @@ public class FlockP2PManager {
 
 	public FlockP2PManager(Activity activity) {
 		this.activity = activity;
-		p2pNetworkHelper = new WiFiDirectHelper(activity,
-				activity.getMainLooper());
+		FlockP2PManager.p2pNetworkHelper = new WiFiDirectHelper(activity,
+				activity.getMainLooper(), (android.net.wifi.p2p.WifiP2pManager) activity
+				.getSystemService(Context.WIFI_P2P_SERVICE));
+		
 		messageTypeToPriorityMap = new HashMap<String, Integer>();
 		messagePriorityList = new ArrayList<String>();
 		peerGroupMap = new HashMap<String, PeerGroup>();
