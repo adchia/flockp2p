@@ -42,6 +42,7 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 	private static WifiP2pManager p2pManager;
 	private static Channel p2pChannel;
 	private final static int CLIENT_PORT = 8988;
+	private static FlockP2PManager flockManager;
 
 	// The following lists are aligned.
 	private LinkedList<PeerGroup> peerGroupQueue;
@@ -102,11 +103,13 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 		}
 	};
 
-	public WiFiDirectHelper(Context context, Looper looper,
-			WifiP2pManager manager) {
+	public WiFiDirectHelper(FlockP2PManager flockP2PManager, Context context,
+			Looper looper, WifiP2pManager manager) {
+		flockManager = flockP2PManager;
 		WiFiDirectHelper.p2pManager = manager;
 		Log.d("initializing", "initializing");
-		WiFiDirectHelper.p2pChannel = WiFiDirectHelper.p2pManager.initialize(context, looper, this);
+		WiFiDirectHelper.p2pChannel = WiFiDirectHelper.p2pManager.initialize(
+				context, looper, this);
 		this.peerGroupQueue = new LinkedList<PeerGroup>();
 		this.messageQueue = new LinkedList<JSONObject>();
 	}
@@ -151,14 +154,7 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 	@Override
 	public void onReceive(Context context, Intent intent) {
 		String action = intent.getAction();
-		if (WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION.equals(action)) {
-			int state = intent.getIntExtra(WifiP2pManager.EXTRA_WIFI_STATE, -1);
-			if (state == WifiP2pManager.WIFI_P2P_STATE_ENABLED) {
-				// TODO: notify application WiFi P2P is good to go
-			} else {
-				// TODO: notify application we need WiFi P2P
-			}
-		} else if (WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION.equals(action)) {
+		if (WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION.equals(action)) {
 			// 2) Discovered peers. Need to actually request
 			Log.d("requesting peers", "yay");
 
@@ -268,11 +264,13 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 				if (flockMsgType.equals(FlockMessageType.FLOOD.toString())) {
 					// Should continue sending
 					if (group.receiveFlood(otherDeviceAddress, hopCount)) {
-						FlockP2PManager.keepFlooding = true;
-					} else 
-						FlockP2PManager.keepFlooding = false;
+						flockManager.floodForward();
+					}
 				} else if (flockMsgType.equals(FlockMessageType.INCREMENTAL)) {
-					// TODO: deal with incoming
+					// add to message queue
+					group.enqueueMessageOfType(actualMessage
+							.getString(FlockP2PManager.MESSAGE_TYPE),
+							actualMessage);
 				}
 			}
 		} catch (JSONException e) {
