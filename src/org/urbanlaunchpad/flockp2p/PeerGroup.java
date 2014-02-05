@@ -107,6 +107,27 @@ public class PeerGroup {
 	}
 
 	/**
+	 * Uploads a single message
+	 * Returns boolean telling whether we sent a message or not
+	 */
+	public boolean uploadMessage() {
+		for (String messageType : FlockP2PManager.messagePriorityList) {
+			// Check if this has priority
+			int count = messageTypeToPriorityCount.get(messageType);
+			if (hasMessageOfType(messageType) && count > 0) {
+				messageTypeToPriorityCount.put(messageType, count - 1);
+				numMessages--;
+				uploadMessagesOfType(messageType);
+				return true;
+			}
+		}
+		
+		// No messages to send
+		resetPriorityCounts();
+		return false;
+	}
+	
+	/**
 	 * Send a single message
 	 * Returns boolean telling whether we sent a message or not
 	 */
@@ -127,6 +148,12 @@ public class PeerGroup {
 		return false;
 	}
 
+	private void uploadMessagesOfType(String messageType) {
+		JSONObject message = messageTypeToQueueMap.get(messageType)
+				.removeLast();
+		FlockP2PManager.p2pNetworkHelper.uploadMessage(message, this);
+	}
+	
 	private void sendMessagesOfType(String messageType) {
 		JSONObject message = messageTypeToQueueMap.get(messageType)
 				.removeLast();

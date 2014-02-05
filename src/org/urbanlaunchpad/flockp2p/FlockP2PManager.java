@@ -41,6 +41,10 @@ public class FlockP2PManager {
 	public static final String MESSAGE_TYPE = "messageType";
 	public static final String TIMESTAMP = "timeStamp";
 	public static final String REQUEST = "request";
+	public static final String REQUEST_URL = "requestUrl";
+	public static final String REQUEST_PARAMS = "requestParams";
+	public static final String REQUEST_KEY = "requestKey";
+	public static final String REQUEST_VALUE = "requestValue";
 	public static final String PEER_GROUP_ID = "peerGroupId";
 	public static final String MESSAGE_JSON = "messageJSON";
 	public static final String MAC_ADDRESS = "macAddress";
@@ -60,6 +64,7 @@ public class FlockP2PManager {
 		peerGroupMap = new HashMap<String, PeerGroup>();
 
 		// add necessary intent values to be matched and register
+		intentFilter.addAction(WifiManager.SUPPLICANT_CONNECTION_CHANGE_ACTION);
 		intentFilter.addAction(WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION);
 		intentFilter.addAction(WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION);
 		intentFilter
@@ -96,12 +101,22 @@ public class FlockP2PManager {
 			public void run() {
 				while (true) {
 					try {
-						Log.d("FlockP2PManager", "find normal message to send");
-						for (PeerGroup group : peerGroupMap.values()) {
-							// Send all messages in each group
-							while (true) {
-								if (!group.sendMessage())
-									break;
+						if (connectedToWiFi) {
+							for (PeerGroup group : peerGroupMap.values()) {
+								// Send all messages in each group
+								while (true) {
+									if (!group.uploadMessage())
+										break;
+								}
+							}
+						} else {
+							Log.d("FlockP2PManager", "find normal message to send");
+							for (PeerGroup group : peerGroupMap.values()) {
+								// Send all messages in each group
+								while (true) {
+									if (!group.sendMessage())
+										break;
+								}
 							}
 						}
 						Thread.sleep(3000);
@@ -158,14 +173,8 @@ public class FlockP2PManager {
 	 * others know
 	 */
 	private void flood() {
-		ConnectivityManager cm = (ConnectivityManager) activity
-				.getSystemService(Context.CONNECTIVITY_SERVICE);
-		NetworkInfo wifi = cm.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
 
-		if (wifi.isConnected()) {
-			prevConnectedToWiFi = connectedToWiFi;
-			connectedToWiFi = true;
-
+		if (connectedToWiFi) {
 			// Get device MAC address
 			WifiManager wifiManager = (WifiManager) activity
 					.getSystemService(Context.WIFI_SERVICE);
@@ -230,9 +239,6 @@ public class FlockP2PManager {
 					e.printStackTrace();
 				}
 			}
-
-			prevConnectedToWiFi = connectedToWiFi;
-			connectedToWiFi = false;
 		}
 	}
 

@@ -6,14 +6,25 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Random;
 
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.message.BasicNameValuePair;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.urbanlaunchpad.flockp2p.FlockP2PManager.FlockMessageType;
@@ -24,6 +35,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.net.NetworkInfo;
+import android.net.wifi.WifiManager;
 import android.net.wifi.WpsInfo;
 import android.net.wifi.p2p.WifiP2pConfig;
 import android.net.wifi.p2p.WifiP2pDeviceList;
@@ -78,7 +90,8 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 						ArrayList<String> listOfAddresses = new ArrayList<String>();
 						for (AddressToHopCount addressToHopCount : group.bestPlacesToSend) {
 							if (peerList.get(addressToHopCount.address) != null) {
-								for (int i = 0; i < (group.deviceAddresses.size() - addressToHopCount.hopCount); i++) {
+								for (int i = 0; i < (group.deviceAddresses
+										.size() - addressToHopCount.hopCount); i++) {
 									listOfAddresses
 											.add(addressToHopCount.address);
 								}
@@ -104,7 +117,8 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 											alreadyConnected = true;
 										}
 										peerGroupQueue.removeLast();
-										currentMessage = messageQueue.removeLast();
+										currentMessage = messageQueue
+												.removeLast();
 									}
 
 									@Override
@@ -140,7 +154,6 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 			networkMessage.put(FlockP2PManager.MESSAGE_JSON, SecurityHelper
 					.encryptMessage(message.toString(), group.key));
 			networkMessage.put(FlockP2PManager.PEER_GROUP_ID, group.name);
-			networkMessage.put(FlockP2PManager.PEER_GROUP_ID, group.name);
 			this.peerGroupQueue.push(group);
 			this.messageQueue.push(networkMessage);
 
@@ -166,10 +179,57 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 
 	}
 
+	public void uploadMessage(JSONObject message, PeerGroup group) {
+		Log.d("SEND_MESSAGE", "sendMessage: " + message.toString() + ", "
+				+ group.name);
+
+		// Submit POST request
+		try {
+			JSONObject requestParams = new JSONObject(
+					message.getString(FlockP2PManager.REQUEST));
+			HttpClient httpclient = new DefaultHttpClient();
+			HttpPost httppost = new HttpPost(
+					requestParams.getString(FlockP2PManager.REQUEST_URL));
+
+			// Request parameters and other properties.
+			List<NameValuePair> params = new ArrayList<NameValuePair>();
+			for (int i = 0; i < requestParams
+					.getJSONArray(FlockP2PManager.REQUEST_PARAMS).length(); i++) {
+				JSONObject param = requestParams
+						.getJSONArray(FlockP2PManager.REQUEST_PARAMS).getJSONObject(i);
+				params.add(new BasicNameValuePair(param
+						.getString(FlockP2PManager.REQUEST_KEY), param
+						.getString(FlockP2PManager.REQUEST_VALUE)));
+			}
+			httppost.setEntity(new UrlEncodedFormEntity(params, "UTF-8"));
+
+			// Execute 
+			httpclient.execute(httppost);
+		} catch (JSONException e) {
+			e.printStackTrace();
+		} catch (UnsupportedEncodingException e) {
+			e.printStackTrace();
+		} catch (ClientProtocolException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+	}
+
 	@Override
 	public void onReceive(Context context, Intent intent) {
 		String action = intent.getAction();
-		if (WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION.equals(action)) {
+		// Monitor for Wifi connection status
+		if (action.equals(WifiManager.SUPPLICANT_CONNECTION_CHANGE_ACTION)) {
+			flockManager.prevConnectedToWiFi = flockManager.connectedToWiFi;
+			if (intent.getBooleanExtra(WifiManager.EXTRA_SUPPLICANT_CONNECTED,
+					false)) {
+				flockManager.connectedToWiFi = true;
+			} else {
+				flockManager.connectedToWiFi = false;
+			}
+		} else if (WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION.equals(action)) {
 			// 2) Discovered peers. Need to actually request
 			Log.d("requesting peers", "yay");
 
