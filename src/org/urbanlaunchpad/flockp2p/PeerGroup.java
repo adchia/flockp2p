@@ -48,11 +48,24 @@ public class PeerGroup {
 		this.bestPlacesToSend = MinMaxPriorityQueue.create();
 	}
 
-	public void receiveFlood(String deviceAddress, int hopCount) {
+	/**
+	 * Updates our best places to send
+	 * @param deviceAddress
+	 * @param hopCount
+	 * @return true if we should continue flooding
+	 */
+	public boolean receiveFlood(String deviceAddress, int hopCount) {
 		bestPlacesToSend.add(new AddressToHopCount(deviceAddress, hopCount));
 		if (bestPlacesToSend.size() > MAX_NUM_ADDRESS_HOP_COUNTS) {
-			bestPlacesToSend.remove();
+			AddressToHopCount removed = bestPlacesToSend.removeLast();
+			
+			// Same as the initial
+			if (removed.address.equals(deviceAddress) && removed.hopCount == hopCount) {
+				return false;
+			}
 		}
+		
+		return true;
 	}
 
 	private void resetPriorityCounts() {

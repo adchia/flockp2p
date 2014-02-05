@@ -42,6 +42,7 @@ public class FlockP2PManager {
 	public static final String REQUEST = "request";
 	public static final String PEER_GROUP_ID = "peerGroupId";
 	public static final String MESSAGE_JSON = "messageJSON";
+	public static final String MAC_ADDRESS = "macAddress";
 
 	public static enum FlockMessageType {
 		FLOOD, INCREMENTAL, DROP
@@ -147,7 +148,6 @@ public class FlockP2PManager {
 		}
 	}
 
-	// TODO: call this flood message every 5 minutes
 	/**
 	 * Checks Wi-Fi connectivity and if connected to network, flood out to let
 	 * others know
