@@ -104,9 +104,9 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 
 	public WiFiDirectHelper(Context context, Looper looper,
 			WifiP2pManager manager) {
-		this.p2pManager = manager;
+		WiFiDirectHelper.p2pManager = manager;
 		Log.d("initializing", "initializing");
-		this.p2pChannel = this.p2pManager.initialize(context, looper, this);
+		WiFiDirectHelper.p2pChannel = WiFiDirectHelper.p2pManager.initialize(context, looper, this);
 		this.peerGroupQueue = new LinkedList<PeerGroup>();
 		this.messageQueue = new LinkedList<JSONObject>();
 	}
@@ -266,9 +266,11 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 						.getString(FlockP2PManager.FLOCK_MESSAGE_TYPE);
 				int hopCount = actualMessage.getInt(FlockP2PManager.REQUEST);
 				if (flockMsgType.equals(FlockMessageType.FLOOD.toString())) {
+					// Should continue sending
 					if (group.receiveFlood(otherDeviceAddress, hopCount)) {
-
-					}
+						FlockP2PManager.keepFlooding = true;
+					} else 
+						FlockP2PManager.keepFlooding = false;
 				} else if (flockMsgType.equals(FlockMessageType.INCREMENTAL)) {
 					// TODO: deal with incoming
 				}

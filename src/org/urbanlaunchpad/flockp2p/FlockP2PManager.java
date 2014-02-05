@@ -24,11 +24,12 @@ public class FlockP2PManager {
 	public boolean connectedToWiFi = false;
 	public Activity activity;
 	private static int FLOOD_PERIOD = 30000;
-    private final IntentFilter intentFilter = new IntentFilter();
+	private final IntentFilter intentFilter = new IntentFilter();
 
 	// Booleans representing modes of p2p
 	private boolean CHECK_ALREADY_UPLOADED = false;
 	private boolean SIMPLE_MODE = true;
+	public static boolean keepFlooding = false;
 
 	// Keeping track of our message types and priorities
 	public static HashMap<String, Integer> messageTypeToPriorityMap;
@@ -51,19 +52,22 @@ public class FlockP2PManager {
 	public FlockP2PManager(Activity activity) {
 		this.activity = activity;
 		p2pNetworkHelper = new WiFiDirectHelper(activity,
-				activity.getMainLooper(), (WifiP2pManager) activity
-				.getSystemService(Context.WIFI_P2P_SERVICE));
+				activity.getMainLooper(),
+				(WifiP2pManager) activity
+						.getSystemService(Context.WIFI_P2P_SERVICE));
 		messageTypeToPriorityMap = new HashMap<String, Integer>();
 		messagePriorityList = new ArrayList<String>();
 		peerGroupMap = new HashMap<String, PeerGroup>();
 
 		// add necessary intent values to be matched and register
-        intentFilter.addAction(WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION);
-        intentFilter.addAction(WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION);
-        intentFilter.addAction(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION);
-        intentFilter.addAction(WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION);
-        activity.registerReceiver(p2pNetworkHelper, intentFilter);
-        
+		intentFilter.addAction(WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION);
+		intentFilter.addAction(WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION);
+		intentFilter
+				.addAction(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION);
+		intentFilter
+				.addAction(WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION);
+		activity.registerReceiver(p2pNetworkHelper, intentFilter);
+
 		// turn on wifi direct
 		WifiManager wifiManager = (WifiManager) activity
 				.getSystemService(Context.WIFI_SERVICE);
@@ -81,6 +85,7 @@ public class FlockP2PManager {
 					} catch (InterruptedException e) {
 						e.printStackTrace();
 					}
+
 				}
 			}
 		}).start();
@@ -185,6 +190,84 @@ public class FlockP2PManager {
 			for (PeerGroup group : peerGroupMap.values()) {
 				group.receiveFlood(macAddress, 0);
 				try {
+					message.put(PEER_GROUP_ID, group.name);
+					p2pNetworkHelper.sendMessage(message, group);
+				} catch (JSONException e) {
+					e.printStackTrace();
+				}
+			}
+		} else {
+			if (prevConnectedToWiFi) {
+				// Get device MAC address
+				WifiManager wifiManager = (WifiManager) activity
+						.getSystemService(Context.WIFI_SERVICE);
+				WifiInfo wInfo = wifiManager.getConnectionInfo();
+				String macAddress = wInfo.getMacAddress();
+
+				// Create flood message
+				JSONObject message = new JSONObject();
+				try {
+					JSONObject floodMsg = new JSONObject();
+					Date timestamp = new Date();
+					floodMsg.put(FLOCK_MESSAGE_TYPE,
+							FlockMessageType.FLOOD.toString());
+					floodMsg.put(TIMESTAMP, timestamp);
+					message.put(MESSAGE_JSON, floodMsg);
+
+					// Flood next best to peer groups
+					for (PeerGroup group : peerGroupMap.values()) {
+						floodMsg.put(REQUEST, group.bestPlacesToSend.peekLast());
+
+						group.receiveFlood(macAddress, 0);
+						try {
+							message.put(PEER_GROUP_ID, group.name);
+							p2pNetworkHelper.sendMessage(message, group);
+						} catch (JSONException e) {
+							e.printStackTrace();
+						}
+					}
+				} catch (JSONException e) {
+					e.printStackTrace();
+				}
+			}
+
+			prevConnectedToWiFi = connectedToWiFi;
+			connectedToWiFi = false;
+		}
+	}
+	
+	private void floodForward() {
+		ConnectivityManager cm = (ConnectivityManager) activity
+				.getSystemService(Context.CONNECTIVITY_SERVICE);
+		NetworkInfo wifi = cm.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+
+		if (wifi.isConnected()) {
+			prevConnectedToWiFi = connectedToWiFi;
+			connectedToWiFi = true;
+
+			// Get device MAC address
+			WifiManager wifiManager = (WifiManager) activity
+					.getSystemService(Context.WIFI_SERVICE);
+			WifiInfo wInfo = wifiManager.getConnectionInfo();
+			String macAddress = wInfo.getMacAddress();
+
+			// Create flood message
+			JSONObject message = new JSONObject();
+			JSONObject floodMsg = new JSONObject();
+			try {
+				Date timestamp = new Date();
+				floodMsg.put(FLOCK_MESSAGE_TYPE,
+						FlockMessageType.FLOOD.toString());
+				floodMsg.put(TIMESTAMP, timestamp);
+				message.put(MESSAGE_JSON, floodMsg);
+			} catch (JSONException e) {
+				e.printStackTrace();
+			}
+
+			// Send message to everyone, not including self
+			for (PeerGroup group : peerGroupMap.values()) {
+				try {
+					floodMsg.put(REQUEST, group.bestPlacesToSend.poll().hopCount + 1);
 					message.put(PEER_GROUP_ID, group.name);
 					p2pNetworkHelper.sendMessage(message, group);
 				} catch (JSONException e) {
