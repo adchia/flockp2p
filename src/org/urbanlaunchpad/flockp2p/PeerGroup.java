@@ -11,6 +11,7 @@ import com.google.common.collect.MinMaxPriorityQueue;
 
 public class PeerGroup {
 	public String key;
+	private WiFiDirectHelper p2pNetworkHelper;
 	public HashMap<String, LinkedList<JSONObject>> messageTypeToQueueMap;
 	public HashMap<String, Integer> messageTypeToPriorityCount;
 	public HashSet<String> deviceAddresses;
@@ -39,13 +40,14 @@ public class PeerGroup {
 
 	}
 
-	public PeerGroup(String key, String name, Collection<String> deviceAddresses) {
+	public PeerGroup(String key, String name, Collection<String> deviceAddresses, WiFiDirectHelper p2pNetworkHelper) {
 		this.key = key;
 		this.name = name;
 		this.messageTypeToQueueMap = new HashMap<String, LinkedList<JSONObject>>();
 		this.messageTypeToPriorityCount = new HashMap<String, Integer>();
 		this.deviceAddresses = new HashSet<String>(deviceAddresses);
 		this.bestPlacesToSend = MinMaxPriorityQueue.create();
+		this.p2pNetworkHelper = p2pNetworkHelper;
 	}
 
 	/**
@@ -151,13 +153,13 @@ public class PeerGroup {
 	private void uploadMessagesOfType(String messageType) {
 		JSONObject message = messageTypeToQueueMap.get(messageType)
 				.removeLast();
-		FlockP2PManager.p2pNetworkHelper.uploadMessage(message, this);
+		p2pNetworkHelper.uploadMessage(message, this);
 	}
 	
 	private void sendMessagesOfType(String messageType) {
 		JSONObject message = messageTypeToQueueMap.get(messageType)
 				.removeLast();
-		FlockP2PManager.p2pNetworkHelper.sendMessage(message, this);
+		p2pNetworkHelper.sendMessage(message, this);
 	}
 
 }

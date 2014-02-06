@@ -19,9 +19,9 @@ import android.net.wifi.p2p.WifiP2pManager;
 import android.util.Log;
 
 public class FlockP2PManager {
-	public static WiFiDirectHelper p2pNetworkHelper;
-	public boolean prevConnectedToWiFi = true;
-	public boolean connectedToWiFi = true;
+	public WiFiDirectHelper p2pNetworkHelper;
+	public boolean prevConnectedToWiFi = false;
+	public boolean connectedToWiFi = false;
 	public Activity activity;
 	private static int FLOOD_PERIOD = 30000;
 	private final IntentFilter intentFilter = new IntentFilter();
@@ -78,6 +78,17 @@ public class FlockP2PManager {
 				.getSystemService(Context.WIFI_SERVICE);
 		wifiManager.setWifiEnabled(true);
 
+		// Check internet connection
+		ConnectivityManager connManager = (ConnectivityManager) activity
+				.getSystemService(Context.CONNECTIVITY_SERVICE);
+		NetworkInfo mWifi = connManager
+				.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+
+		if (mWifi.isConnected()) {
+			prevConnectedToWiFi = true;
+			connectedToWiFi = true;
+		}
+
 		// turn on periodic flooding
 		new Thread(new Runnable() {
 			@Override
@@ -132,6 +143,8 @@ public class FlockP2PManager {
 	public boolean enqueueMessage(String messageType, String request,
 			String peerGroupName) {
 
+		JSONObject wrappedMessage = new JSONObject();
+
 		// Serialize into JSON Object and add to right linked list
 		try {
 			JSONObject messageObject = new JSONObject();
@@ -141,10 +154,12 @@ public class FlockP2PManager {
 			messageObject.put(MESSAGE_TYPE, messageType);
 			messageObject.put(REQUEST, request);
 			messageObject.put(TIMESTAMP, timestamp);
+			wrappedMessage.put(MESSAGE_JSON, messageObject);
+
 			peerGroupMap.get(peerGroupName).addMessageType(messageType,
 					messageTypeToPriorityMap.get(messageType));
 			peerGroupMap.get(peerGroupName).enqueueMessageOfType(messageType,
-					messageObject);
+					wrappedMessage);
 		} catch (JSONException e) {
 			e.printStackTrace();
 			return false;
@@ -155,7 +170,7 @@ public class FlockP2PManager {
 	public void addPeerGroup(String peerGroupName, String key,
 			Collection<String> deviceAddresses) {
 		peerGroupMap.put(peerGroupName, new PeerGroup(key, peerGroupName,
-				deviceAddresses));
+				deviceAddresses, p2pNetworkHelper));
 		for (String messageType : messagePriorityList) {
 			peerGroupMap.get(peerGroupName).addMessageType(messageType,
 					messageTypeToPriorityMap.get(messageType));
@@ -300,4 +315,11 @@ public class FlockP2PManager {
 		}
 	}
 
+	public void register() {
+		activity.registerReceiver(p2pNetworkHelper, intentFilter);
+	}
+
+	public void unregister() {
+		activity.unregisterReceiver(p2pNetworkHelper);
+	}
 }

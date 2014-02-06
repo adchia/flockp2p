@@ -68,6 +68,7 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 	// Locks
 	private static String mutex = "mutex";
 	private static boolean alreadyConnected = false;
+	private static boolean isFlooding = false;
 	private static String otherDeviceAddress;
 	private static Random random = new Random();
 
@@ -76,57 +77,78 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 		@Override
 		public void onPeersAvailable(WifiP2pDeviceList peerList) {
 			Log.d("got peer list!", "yay");
-
+			Log.d("peerList: ", peerList.getDeviceList().toString());
+			if (peerList.getDeviceList().isEmpty())
+				return;
+			
 			while (!peerGroupQueue.isEmpty()) {
-				synchronized (mutex) {
-					if (!alreadyConnected) {
-						PeerGroup group = peerGroupQueue.peekLast();
-						currentMessage = messageQueue.peekLast();
+				if (!alreadyConnected) {
 
-						// send out message to one of top ten devices in peer
-						// group inversely weighted by hopCounts
-						ArrayList<String> listOfAddresses = new ArrayList<String>();
-						for (AddressToHopCount addressToHopCount : group.bestPlacesToSend) {
-							if (peerList.get(addressToHopCount.address) != null) {
-								for (int i = 0; i < (group.deviceAddresses
-										.size() - addressToHopCount.hopCount); i++) {
-									listOfAddresses
-											.add(addressToHopCount.address);
-								}
+					PeerGroup group = peerGroupQueue.peekLast();
+					currentMessage = messageQueue.peekLast();
+
+					// send out message to one of top ten devices in peer
+					// group inversely weighted by hopCounts
+					ArrayList<String> listOfAddresses = new ArrayList<String>();
+					for (AddressToHopCount addressToHopCount : group.bestPlacesToSend) {
+						if (peerList.get(addressToHopCount.address) != null) {
+							for (int i = 0; i < (group.deviceAddresses.size() - addressToHopCount.hopCount); i++) {
+								listOfAddresses.add(addressToHopCount.address);
+							}
+						}
+					}
+
+					String tmpDeviceAddress = null;
+					if (listOfAddresses.size() == 0) { // pick any address
+														// in peer group
+														// then
+						if (!WiFiDirectHelper.isFlooding) // if not
+															// flooding, no
+															// good places
+															// to send
+							return;
+
+						for (String address : group.deviceAddresses) {
+							if (peerList.get(address) != null) {
+								tmpDeviceAddress = address;
+								break;
 							}
 						}
 
+						if (tmpDeviceAddress == null)
+							return;
+					} else {
 						int randInt = random.nextInt(listOfAddresses.size());
-						final String deviceAddress = listOfAddresses
-								.get(randInt);
-						WifiP2pConfig config = new WifiP2pConfig();
-						config.deviceAddress = deviceAddress;
-						config.wps.setup = WpsInfo.PBC;
-
-						Log.d("connecting to device!", "yay");
-						// Connects to device.
-						p2pManager.connect(p2pChannel, config,
-								new ActionListener() {
-
-									@Override
-									public void onSuccess() {
-										otherDeviceAddress = deviceAddress;
-										synchronized (mutex) {
-											alreadyConnected = true;
-										}
-										peerGroupQueue.removeLast();
-										currentMessage = messageQueue
-												.removeLast();
-									}
-
-									@Override
-									public void onFailure(int reason) {
-									}
-								});
-
+						tmpDeviceAddress = listOfAddresses.get(randInt);
 					}
+
+					final String deviceAddress = tmpDeviceAddress;
+
+					WifiP2pConfig config = new WifiP2pConfig();
+					config.deviceAddress = deviceAddress;
+					config.wps.setup = WpsInfo.PBC;
+
+					Log.d("connecting to device!", "yay");
+					// Connects to device.
+					alreadyConnected = true;
+					p2pManager.connect(p2pChannel, config,
+							new ActionListener() {
+
+								@Override
+								public void onSuccess() {
+									otherDeviceAddress = deviceAddress;
+									peerGroupQueue.removeLast();
+									currentMessage = messageQueue.removeLast();
+								}
+
+								@Override
+								public void onFailure(int reason) {
+								}
+							});
+
 				}
 			}
+
 		}
 	};
 
@@ -152,25 +174,34 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 			networkMessage.put(FlockP2PManager.MESSAGE_JSON, SecurityHelper
 					.encryptMessage(message.toString(), group.key));
 			networkMessage.put(FlockP2PManager.PEER_GROUP_ID, group.name);
+
+			JSONObject actualMessage = new JSONObject(
+					message.getString(FlockP2PManager.MESSAGE_JSON));
+			WiFiDirectHelper.isFlooding = actualMessage.getString(
+					FlockP2PManager.FLOCK_MESSAGE_TYPE).equals(
+					FlockMessageType.FLOOD.toString());
 			this.peerGroupQueue.push(group);
 			this.messageQueue.push(networkMessage);
 
-			// Searches for peers. Keeps going until connected or P2P group made
-			p2pManager.discoverPeers(p2pChannel, new ActionListener() {
+			if (!alreadyConnected) {
+				// Searches for peers. Keeps going until connected or P2P group
+				// made
+				p2pManager.discoverPeers(p2pChannel, new ActionListener() {
 
-				@Override
-				public void onSuccess() {
-					Log.d("FOUND PEERS", "yay");
-				}
+					@Override
+					public void onSuccess() {
+						Log.d("FOUND PEERS", "yay");
+					}
 
-				@Override
-				public void onFailure(int reasonCode) {
-					// Code for when the discovery initiation fails goes
-					// here.
-					// Alert the user that something went wrong.
-					Log.d("FOUND PEERS", "nope :( " + reasonCode);
-				}
-			});
+					@Override
+					public void onFailure(int reasonCode) {
+						// Code for when the discovery initiation fails goes
+						// here.
+						// Alert the user that something went wrong.
+						Log.d("FOUND PEERS", "nope :( " + reasonCode);
+					}
+				});
+			}
 		} catch (JSONException e) {
 			e.printStackTrace();
 		}
@@ -183,25 +214,28 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 
 		// Submit POST request
 		try {
+			JSONObject actualMessage = new JSONObject(
+					message.getString(FlockP2PManager.MESSAGE_JSON));
+
 			JSONObject requestParams = new JSONObject(
-					message.getString(FlockP2PManager.REQUEST));
+					actualMessage.getString(FlockP2PManager.REQUEST));
 			HttpClient httpclient = new DefaultHttpClient();
 			HttpPost httppost = new HttpPost(
 					requestParams.getString(FlockP2PManager.REQUEST_URL));
 
 			// Request parameters and other properties.
 			List<NameValuePair> params = new ArrayList<NameValuePair>();
-			for (int i = 0; i < requestParams
-					.getJSONArray(FlockP2PManager.REQUEST_PARAMS).length(); i++) {
-				JSONObject param = requestParams
-						.getJSONArray(FlockP2PManager.REQUEST_PARAMS).getJSONObject(i);
+			for (int i = 0; i < requestParams.getJSONArray(
+					FlockP2PManager.REQUEST_PARAMS).length(); i++) {
+				JSONObject param = requestParams.getJSONArray(
+						FlockP2PManager.REQUEST_PARAMS).getJSONObject(i);
 				params.add(new BasicNameValuePair(param
 						.getString(FlockP2PManager.REQUEST_KEY), param
 						.getString(FlockP2PManager.REQUEST_VALUE)));
 			}
 			httppost.setEntity(new UrlEncodedFormEntity(params, "UTF-8"));
 
-			// Execute 
+			// Execute
 			httpclient.execute(httppost);
 		} catch (JSONException e) {
 			e.printStackTrace();
@@ -377,7 +411,7 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 			OutputStream outputStream = socket.getOutputStream();
 			outputStream.write(message.toString().getBytes());
 			Log.d("SENDING MESSAGE", "sent message: " + message.toString());
-			p2pManager.cancelConnect(p2pChannel, new ActionListener() {
+			p2pManager.removeGroup(p2pChannel, new ActionListener() {
 
 				@Override
 				public void onSuccess() {
