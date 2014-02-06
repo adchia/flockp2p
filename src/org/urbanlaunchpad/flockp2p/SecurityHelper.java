@@ -26,14 +26,16 @@ public class SecurityHelper {
 
 	// symmetric key decryption
 	public static String decryptMessage(String message, String key) {
+		
 		Cipher cipher;
 		String decryptedString = null;
 		try {
 			cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
 			SecretKeySpec secretKey = new SecretKeySpec(key.getBytes(), "AES");
 			cipher.init(Cipher.DECRYPT_MODE, secretKey);
-			decryptedString = new String(Base64.decode(
-					cipher.doFinal(message.getBytes()), Base64.DEFAULT));
+			String cleanString = message.replaceAll("\n", "");
+			decryptedString = new String(
+					cipher.doFinal(Base64.decode(cleanString.getBytes(), Base64.DEFAULT)));
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

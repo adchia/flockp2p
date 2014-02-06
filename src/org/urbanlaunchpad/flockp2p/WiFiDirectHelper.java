@@ -203,7 +203,7 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 			networkMessage.put(FlockP2PManager.MESSAGE_JSON, SecurityHelper
 					.encryptMessage(message.toString(), group.key));
 			networkMessage.put(FlockP2PManager.PEER_GROUP_ID, group.name);
-
+			
 			JSONObject actualMessage = new JSONObject(
 					message.getString(FlockP2PManager.MESSAGE_JSON));
 			WiFiDirectHelper.isFlooding = actualMessage.getString(
