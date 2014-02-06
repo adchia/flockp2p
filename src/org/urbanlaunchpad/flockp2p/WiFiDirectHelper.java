@@ -73,6 +73,7 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 	private static String otherDeviceAddress;
 	private static Random random = new Random();
 	private boolean alreadyGotPeers = false;
+	private boolean alreadyDiscovering = false;
 
 	// 3) Listener that is fired when we request and get a peer list
 	private PeerListListener peerListListener = new PeerListListener() {
@@ -179,6 +180,7 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 
 				}).start();
 				p2pManager.stopPeerDiscovery(p2pChannel, null);
+				alreadyDiscovering = false;
 			}
 		}
 	};
@@ -213,7 +215,7 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 			this.peerGroupQueue.push(group);
 			this.messageQueue.push(networkMessage);
 
-			if (!alreadyGotPeers) {
+			if (!alreadyDiscovering) {
 				// Searches for peers. Keeps going until connected or P2P group
 				// made
 				p2pManager.discoverPeers(p2pChannel, new ActionListener() {
@@ -221,6 +223,7 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 					@Override
 					public void onSuccess() {
 						Log.d("FOUND PEERS", "yay");
+						alreadyDiscovering = true;
 					}
 
 					@Override
