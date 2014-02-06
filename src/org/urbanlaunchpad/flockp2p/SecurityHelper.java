@@ -18,7 +18,7 @@ public class SecurityHelper {
 			encryptedString = Base64.encodeToString(
 					cipher.doFinal(message.getBytes()), Base64.DEFAULT);
 		} catch (Exception e) {
-			// do nothing
+			e.printStackTrace();
 		}
 
 		return encryptedString;
@@ -35,7 +35,7 @@ public class SecurityHelper {
 			decryptedString = new String(Base64.decode(
 					cipher.doFinal(message.getBytes()), Base64.DEFAULT));
 		} catch (Exception e) {
-			// do nothing
+			e.printStackTrace();
 		}
 
 		return decryptedString;

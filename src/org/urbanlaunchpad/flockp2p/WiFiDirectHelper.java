@@ -71,84 +71,112 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 	private static boolean isFlooding = false;
 	private static String otherDeviceAddress;
 	private static Random random = new Random();
+	private boolean alreadyGotPeers = false;
 
 	// 3) Listener that is fired when we request and get a peer list
 	private PeerListListener peerListListener = new PeerListListener() {
 		@Override
-		public void onPeersAvailable(WifiP2pDeviceList peerList) {
-			Log.d("got peer list!", "yay");
-			Log.d("peerList: ", peerList.getDeviceList().toString());
-			if (peerList.getDeviceList().isEmpty())
-				return;
-			
-			while (!peerGroupQueue.isEmpty()) {
-				if (!alreadyConnected) {
-
-					PeerGroup group = peerGroupQueue.peekLast();
-					currentMessage = messageQueue.peekLast();
-
-					// send out message to one of top ten devices in peer
-					// group inversely weighted by hopCounts
-					ArrayList<String> listOfAddresses = new ArrayList<String>();
-					for (AddressToHopCount addressToHopCount : group.bestPlacesToSend) {
-						if (peerList.get(addressToHopCount.address) != null) {
-							for (int i = 0; i < (group.deviceAddresses.size() - addressToHopCount.hopCount); i++) {
-								listOfAddresses.add(addressToHopCount.address);
-							}
-						}
-					}
-
-					String tmpDeviceAddress = null;
-					if (listOfAddresses.size() == 0) { // pick any address
-														// in peer group
-														// then
-						if (!WiFiDirectHelper.isFlooding) // if not
-															// flooding, no
-															// good places
-															// to send
+		public void onPeersAvailable(final WifiP2pDeviceList peerList) {
+			if (!alreadyGotPeers) {
+				new Thread(new Runnable() {
+					@Override
+					public void run() {
+						alreadyGotPeers = true;
+						Log.d("got peer list!", "yay");
+						Log.d("peerList: ", peerList.getDeviceList().toString());
+						if (peerList.getDeviceList().isEmpty()) {
+							alreadyGotPeers = false;
 							return;
-
-						for (String address : group.deviceAddresses) {
-							if (peerList.get(address) != null) {
-								tmpDeviceAddress = address;
-								break;
-							}
 						}
 
-						if (tmpDeviceAddress == null)
-							return;
-					} else {
-						int randInt = random.nextInt(listOfAddresses.size());
-						tmpDeviceAddress = listOfAddresses.get(randInt);
+						while (!peerGroupQueue.isEmpty()) {
+							if (!alreadyConnected) {
+
+								PeerGroup group = peerGroupQueue.peekLast();
+								currentMessage = messageQueue.peekLast();
+
+								// send out message to one of top ten devices in
+								// peer
+								// group inversely weighted by hopCounts
+								ArrayList<String> listOfAddresses = new ArrayList<String>();
+								for (AddressToHopCount addressToHopCount : group.bestPlacesToSend) {
+									if (peerList.get(addressToHopCount.address) != null) {
+										for (int i = 0; i < (group.deviceAddresses
+												.size() - addressToHopCount.hopCount); i++) {
+											listOfAddresses
+													.add(addressToHopCount.address);
+										}
+									}
+								}
+
+								String tmpDeviceAddress = null;
+								if (listOfAddresses.size() == 0) { // pick any
+																	// address
+																	// in peer
+																	// group
+																	// then
+									if (!WiFiDirectHelper.isFlooding) { // if
+																		// not
+																		// flooding,
+																		// no
+																		// good
+																		// places
+																		// to
+																		// send
+										alreadyGotPeers = false;
+										return;
+									}
+									for (String address : group.deviceAddresses) {
+										if (peerList.get(address) != null) {
+											tmpDeviceAddress = address;
+											break;
+										}
+									}
+
+									if (tmpDeviceAddress == null) {
+										alreadyGotPeers = false;
+										return;
+									}
+								} else {
+									int randInt = random
+											.nextInt(listOfAddresses.size());
+									tmpDeviceAddress = listOfAddresses
+											.get(randInt);
+								}
+
+								final String deviceAddress = tmpDeviceAddress;
+
+								WifiP2pConfig config = new WifiP2pConfig();
+								config.deviceAddress = deviceAddress;
+								config.wps.setup = WpsInfo.PBC;
+
+								Log.d("connecting to device!", "yay");
+								// Connects to device.
+								alreadyConnected = true;
+								p2pManager.connect(p2pChannel, config,
+										new ActionListener() {
+
+											@Override
+											public void onSuccess() {
+												otherDeviceAddress = deviceAddress;
+												peerGroupQueue.removeLast();
+												currentMessage = messageQueue
+														.removeLast();
+											}
+
+											@Override
+											public void onFailure(int reason) {
+											}
+										});
+
+							}
+						}
+						alreadyGotPeers = false;
+
 					}
 
-					final String deviceAddress = tmpDeviceAddress;
-
-					WifiP2pConfig config = new WifiP2pConfig();
-					config.deviceAddress = deviceAddress;
-					config.wps.setup = WpsInfo.PBC;
-
-					Log.d("connecting to device!", "yay");
-					// Connects to device.
-					alreadyConnected = true;
-					p2pManager.connect(p2pChannel, config,
-							new ActionListener() {
-
-								@Override
-								public void onSuccess() {
-									otherDeviceAddress = deviceAddress;
-									peerGroupQueue.removeLast();
-									currentMessage = messageQueue.removeLast();
-								}
-
-								@Override
-								public void onFailure(int reason) {
-								}
-							});
-
-				}
+				}).start();
 			}
-
 		}
 	};
 
@@ -161,6 +189,7 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 				context, looper, this);
 		this.peerGroupQueue = new LinkedList<PeerGroup>();
 		this.messageQueue = new LinkedList<JSONObject>();
+		p2pManager.discoverPeers(p2pChannel, null);
 	}
 
 	// 1) Have message to send. Request peer list and save message/group
@@ -183,7 +212,7 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 			this.peerGroupQueue.push(group);
 			this.messageQueue.push(networkMessage);
 
-			if (!alreadyConnected) {
+			if (!alreadyGotPeers) {
 				// Searches for peers. Keeps going until connected or P2P group
 				// made
 				p2pManager.discoverPeers(p2pChannel, new ActionListener() {
@@ -312,7 +341,7 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 				 */
 				Log.d("RECEIVING MESSAGE", "receiving messages");
 
-				ServerSocket serverSocket = new ServerSocket(8888);
+				ServerSocket serverSocket = new ServerSocket(8988);
 				Socket client = serverSocket.accept();
 
 				/**
@@ -338,6 +367,22 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 				parseIncomingMessage(incomingMessage);
 
 				serverSocket.close();
+				p2pManager.removeGroup(p2pChannel, new ActionListener() {
+
+					@Override
+					public void onSuccess() {
+						synchronized (mutex) {
+							Log.d("disconnected success", "yay");
+							alreadyConnected = false;
+						}
+					}
+
+					@Override
+					public void onFailure(int reason) {
+						Log.d("disconnected fail", ":( " + reason);
+					}
+				});
+
 				return incomingMessage;
 			} catch (IOException e) {
 				return null;
@@ -401,7 +446,7 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 			 */
 			socket.bind(null);
 			socket.connect((new InetSocketAddress(groupOwnerAddress,
-					CLIENT_PORT)), 500);
+					CLIENT_PORT)), 5000);
 
 			/**
 			 * Create a byte stream from message and pipe it to the output
@@ -411,23 +456,12 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 			OutputStream outputStream = socket.getOutputStream();
 			outputStream.write(message.toString().getBytes());
 			Log.d("SENDING MESSAGE", "sent message: " + message.toString());
-			p2pManager.removeGroup(p2pChannel, new ActionListener() {
 
-				@Override
-				public void onSuccess() {
-					synchronized (mutex) {
-						alreadyConnected = false;
-					}
-				}
-
-				@Override
-				public void onFailure(int reason) {
-				}
-			});
 			outputStream.close();
 		} catch (FileNotFoundException e) {
 			// catch logic
 		} catch (IOException e) {
+			e.printStackTrace();
 			// catch logic
 		}
 
@@ -460,8 +494,10 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 
 		// This device is server
 		if (info.groupFormed && info.isGroupOwner) {
+			alreadyConnected = true;
 			new ServerSocketTask().execute();
 		} else if (info.groupFormed) {
+			alreadyConnected = true;
 			// This device is client
 			new Thread(new Runnable() {
 				@Override
@@ -469,6 +505,8 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 					sendMessageThroughSocket(currentMessage);
 				}
 			}).start();
+		} else { // request discovery
+			p2pManager.discoverPeers(p2pChannel, null);
 		}
 	}
 

@@ -131,7 +131,7 @@ public class FlockP2PManager {
 								}
 							}
 						}
-						Thread.sleep(3000);
+						Thread.sleep(5000);
 					} catch (InterruptedException e) {
 						e.printStackTrace();
 					}
@@ -207,19 +207,18 @@ public class FlockP2PManager {
 				floodMsg.put(REQUEST, 0);
 				floodMsg.put(TIMESTAMP, timestamp);
 				message.put(MESSAGE_JSON, floodMsg);
+				// Send message to everyone, including self
+				for (PeerGroup group : peerGroupMap.values()) {
+					group.receiveFlood(macAddress, 0);
+					try {
+						message.put(PEER_GROUP_ID, group.name);
+						p2pNetworkHelper.sendMessage(message, group);
+					} catch (JSONException e) {
+						e.printStackTrace();
+					}
+				}
 			} catch (JSONException e) {
 				e.printStackTrace();
-			}
-
-			// Send message to everyone, including self
-			for (PeerGroup group : peerGroupMap.values()) {
-				group.receiveFlood(macAddress, 0);
-				try {
-					message.put(PEER_GROUP_ID, group.name);
-					p2pNetworkHelper.sendMessage(message, group);
-				} catch (JSONException e) {
-					e.printStackTrace();
-				}
 			}
 		} else {
 			if (prevConnectedToWiFi) {
@@ -237,11 +236,11 @@ public class FlockP2PManager {
 					floodMsg.put(FLOCK_MESSAGE_TYPE,
 							FlockMessageType.FLOOD.toString());
 					floodMsg.put(TIMESTAMP, timestamp);
-					message.put(MESSAGE_JSON, floodMsg);
 
 					// Flood next best to peer groups
 					for (PeerGroup group : peerGroupMap.values()) {
 						floodMsg.put(REQUEST, group.bestPlacesToSend.peekLast());
+						message.put(MESSAGE_JSON, floodMsg);
 
 						group.receiveFlood(macAddress, 0);
 						try {
@@ -266,7 +265,6 @@ public class FlockP2PManager {
 			Date timestamp = new Date();
 			floodMsg.put(FLOCK_MESSAGE_TYPE, FlockMessageType.FLOOD.toString());
 			floodMsg.put(TIMESTAMP, timestamp);
-			message.put(MESSAGE_JSON, floodMsg);
 		} catch (JSONException e) {
 			e.printStackTrace();
 		}
@@ -276,6 +274,7 @@ public class FlockP2PManager {
 			try {
 				floodMsg.put(REQUEST,
 						group.bestPlacesToSend.poll().hopCount + 1);
+				message.put(MESSAGE_JSON, floodMsg);
 				message.put(PEER_GROUP_ID, group.name);
 				p2pNetworkHelper.sendMessage(message, group);
 			} catch (JSONException e) {
