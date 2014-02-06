@@ -19,6 +19,7 @@ import android.net.wifi.p2p.WifiP2pManager;
 import android.util.Log;
 
 public class FlockP2PManager {
+	public String macAddress;
 	public WiFiDirectHelper p2pNetworkHelper;
 	public boolean prevConnectedToWiFi = false;
 	public boolean connectedToWiFi = false;
@@ -77,7 +78,9 @@ public class FlockP2PManager {
 		WifiManager wifiManager = (WifiManager) activity
 				.getSystemService(Context.WIFI_SERVICE);
 		wifiManager.setWifiEnabled(true);
-
+		WifiInfo wInfo = wifiManager.getConnectionInfo();
+		macAddress = wInfo.getMacAddress();
+		
 		// Check internet connection
 		ConnectivityManager connManager = (ConnectivityManager) activity
 				.getSystemService(Context.CONNECTIVITY_SERVICE);
@@ -143,8 +146,6 @@ public class FlockP2PManager {
 	public boolean enqueueMessage(String messageType, String request,
 			String peerGroupName) {
 
-		JSONObject wrappedMessage = new JSONObject();
-
 		// Serialize into JSON Object and add to right linked list
 		try {
 			JSONObject messageObject = new JSONObject();
@@ -154,12 +155,11 @@ public class FlockP2PManager {
 			messageObject.put(MESSAGE_TYPE, messageType);
 			messageObject.put(REQUEST, request);
 			messageObject.put(TIMESTAMP, timestamp);
-			wrappedMessage.put(MESSAGE_JSON, messageObject);
 
 			peerGroupMap.get(peerGroupName).addMessageType(messageType,
 					messageTypeToPriorityMap.get(messageType));
 			peerGroupMap.get(peerGroupName).enqueueMessageOfType(messageType,
-					wrappedMessage);
+					messageObject);
 		} catch (JSONException e) {
 			e.printStackTrace();
 			return false;
@@ -191,12 +191,6 @@ public class FlockP2PManager {
 	private void flood() {
 
 		if (connectedToWiFi) {
-			// Get device MAC address
-			WifiManager wifiManager = (WifiManager) activity
-					.getSystemService(Context.WIFI_SERVICE);
-			WifiInfo wInfo = wifiManager.getConnectionInfo();
-			String macAddress = wInfo.getMacAddress();
-
 			// Create flood message
 			try {
 				JSONObject floodMsg = new JSONObject();
@@ -205,6 +199,7 @@ public class FlockP2PManager {
 						FlockMessageType.FLOOD.toString());
 				floodMsg.put(REQUEST, 0);
 				floodMsg.put(TIMESTAMP, timestamp);
+				floodMsg.put(MAC_ADDRESS, macAddress);
 				// Send message to everyone, including self
 				for (PeerGroup group : peerGroupMap.values()) {
 					group.receiveFlood(macAddress, 0);
@@ -267,9 +262,7 @@ public class FlockP2PManager {
 			try {
 				floodMsg.put(REQUEST,
 						group.bestPlacesToSend.poll().hopCount + 1);
-				message.put(MESSAGE_JSON, floodMsg);
-				message.put(PEER_GROUP_ID, group.name);
-				p2pNetworkHelper.sendMessage(message, group);
+				p2pNetworkHelper.sendMessage(floodMsg, group);
 			} catch (JSONException e) {
 				e.printStackTrace();
 			}

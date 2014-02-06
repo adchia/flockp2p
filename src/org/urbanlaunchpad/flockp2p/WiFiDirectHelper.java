@@ -9,6 +9,7 @@ import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -78,10 +79,11 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 		@Override
 		public void onPeersAvailable(final WifiP2pDeviceList peerList) {
 			if (!alreadyGotPeers) {
+				alreadyGotPeers = true;
+
 				new Thread(new Runnable() {
 					@Override
 					public void run() {
-						alreadyGotPeers = true;
 						Log.d("got peer list!", "yay");
 						Log.d("peerList: ", peerList.getDeviceList().toString());
 						if (peerList.getDeviceList().isEmpty()) {
@@ -176,6 +178,7 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 					}
 
 				}).start();
+				p2pManager.stopPeerDiscovery(p2pChannel, null);
 			}
 		}
 	};
@@ -204,9 +207,7 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 					.encryptMessage(message.toString(), group.key));
 			networkMessage.put(FlockP2PManager.PEER_GROUP_ID, group.name);
 			
-			JSONObject actualMessage = new JSONObject(
-					message.getString(FlockP2PManager.MESSAGE_JSON));
-			WiFiDirectHelper.isFlooding = actualMessage.getString(
+			WiFiDirectHelper.isFlooding = message.getString(
 					FlockP2PManager.FLOCK_MESSAGE_TYPE).equals(
 					FlockMessageType.FLOOD.toString());
 			this.peerGroupQueue.push(group);
@@ -243,11 +244,8 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 
 		// Submit POST request
 		try {
-			JSONObject actualMessage = new JSONObject(
-					message.getString(FlockP2PManager.MESSAGE_JSON));
-
 			JSONObject requestParams = new JSONObject(
-					actualMessage.getString(FlockP2PManager.REQUEST));
+					message.getString(FlockP2PManager.REQUEST));
 			HttpClient httpclient = new DefaultHttpClient();
 			HttpPost httppost = new HttpPost(
 					requestParams.getString(FlockP2PManager.REQUEST_URL));
@@ -413,9 +411,11 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 				String flockMsgType = actualMessage
 						.getString(FlockP2PManager.FLOCK_MESSAGE_TYPE);
 				int hopCount = actualMessage.getInt(FlockP2PManager.REQUEST);
-				if (flockMsgType.equals(FlockMessageType.FLOOD.toString())) {
+				String address = actualMessage
+						.getString(FlockP2PManager.MAC_ADDRESS);
+				if (flockMsgType.equals(FlockMessageType.FLOOD.toString()) && !address.equals(flockManager.macAddress)) {
 					// Should continue sending
-					if (group.receiveFlood(otherDeviceAddress, hopCount)) {
+					if (group.receiveFlood(address, hopCount)) {
 						flockManager.floodForward();
 					}
 				} else if (flockMsgType.equals(FlockMessageType.INCREMENTAL)) {
@@ -505,8 +505,6 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 					sendMessageThroughSocket(currentMessage);
 				}
 			}).start();
-		} else { // request discovery
-			p2pManager.discoverPeers(p2pChannel, null);
 		}
 	}
 
