@@ -9,7 +9,6 @@ import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.NetworkInterface;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -74,6 +73,7 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 	private static Random random = new Random();
 	private boolean alreadyGotPeers = false;
 	private boolean alreadyDiscovering = false;
+	private WifiP2pDeviceList lastPeerList;
 
 	// 3) Listener that is fired when we request and get a peer list
 	private PeerListListener peerListListener = new PeerListListener() {
@@ -81,13 +81,14 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 		public void onPeersAvailable(final WifiP2pDeviceList peerList) {
 			if (!alreadyGotPeers) {
 				alreadyGotPeers = true;
-
+				lastPeerList = peerList;
+				
 				new Thread(new Runnable() {
 					@Override
 					public void run() {
 						Log.d("got peer list!", "yay");
-						Log.d("peerList: ", peerList.getDeviceList().toString());
-						if (peerList.getDeviceList().isEmpty()) {
+						Log.d("peerList: ", lastPeerList.getDeviceList().toString());
+						if (lastPeerList.getDeviceList().isEmpty()) {
 							alreadyGotPeers = false;
 							return;
 						}
@@ -103,7 +104,7 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 								// group inversely weighted by hopCounts
 								ArrayList<String> listOfAddresses = new ArrayList<String>();
 								for (AddressToHopCount addressToHopCount : group.bestPlacesToSend) {
-									if (peerList.get(addressToHopCount.address) != null) {
+									if (lastPeerList.get(addressToHopCount.address) != null) {
 										for (int i = 0; i < (group.deviceAddresses
 												.size() - addressToHopCount.hopCount); i++) {
 											listOfAddresses
@@ -130,7 +131,7 @@ public class WiFiDirectHelper extends BroadcastReceiver implements
 										return;
 									}
 									for (String address : group.deviceAddresses) {
-										if (peerList.get(address) != null) {
+										if (lastPeerList.get(address) != null) {
 											tmpDeviceAddress = address;
 											break;
 										}
