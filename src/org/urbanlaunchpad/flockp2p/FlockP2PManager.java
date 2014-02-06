@@ -198,7 +198,6 @@ public class FlockP2PManager {
 			String macAddress = wInfo.getMacAddress();
 
 			// Create flood message
-			JSONObject message = new JSONObject();
 			try {
 				JSONObject floodMsg = new JSONObject();
 				Date timestamp = new Date();
@@ -206,16 +205,10 @@ public class FlockP2PManager {
 						FlockMessageType.FLOOD.toString());
 				floodMsg.put(REQUEST, 0);
 				floodMsg.put(TIMESTAMP, timestamp);
-				message.put(MESSAGE_JSON, floodMsg);
 				// Send message to everyone, including self
 				for (PeerGroup group : peerGroupMap.values()) {
 					group.receiveFlood(macAddress, 0);
-					try {
-						message.put(PEER_GROUP_ID, group.name);
-						p2pNetworkHelper.sendMessage(message, group);
-					} catch (JSONException e) {
-						e.printStackTrace();
-					}
+					p2pNetworkHelper.sendMessage(floodMsg, group);
 				}
 			} catch (JSONException e) {
 				e.printStackTrace();
